@@ -1,0 +1,158 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 420" width="1200" height="420">
+  <defs>
+    <!-- Background Gradients -->
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#050507" />
+      <stop offset="50%" stop-color="#090a0f" />
+      <stop offset="100%" stop-color="#040405" />
+    </linearGradient>
+
+    <radialGradient id="orangeGlow" cx="15%" cy="30%" r="65%">
+      <stop offset="0%" stop-color="#f97316" stop-opacity="0.18" />
+      <stop offset="60%" stop-color="#f97316" stop-opacity="0.02" />
+      <stop offset="100%" stop-color="#000000" stop-opacity="0" />
+    </radialGradient>
+
+    <radialGradient id="cardGlow" cx="80%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#ea580c" stop-opacity="0.12" />
+      <stop offset="100%" stop-color="#000000" stop-opacity="0" />
+    </radialGradient>
+
+    <!-- Linear Gradients for Accents -->
+    <linearGradient id="brandGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#f97316" />
+      <stop offset="100%" stop-color="#fb923c" />
+    </linearGradient>
+
+    <linearGradient id="cardBorder" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#f97316" stop-opacity="0.4" />
+      <stop offset="50%" stop-color="#27272a" stop-opacity="0.6" />
+      <stop offset="100%" stop-color="#18181b" stop-opacity="0.8" />
+    </linearGradient>
+
+    <linearGradient id="accentLine" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#f97316" stop-opacity="0" />
+      <stop offset="50%" stop-color="#f97316" stop-opacity="0.8" />
+      <stop offset="100%" stop-color="#f97316" stop-opacity="0" />
+    </linearGradient>
+
+    <!-- Grid Pattern -->
+    <pattern id="techGrid" width="40" height="40" patternUnits="userSpaceOnUse">
+      <path d="M 40 0 L 0 0 0 40" fill="none" stroke="#27272a" stroke-width="0.5" stroke-opacity="0.25" />
+      <circle cx="40" cy="40" r="1" fill="#f97316" fill-opacity="0.3" />
+    </pattern>
+  </defs>
+
+  <!-- Background Base -->
+  <rect width="1200" height="420" fill="url(#bgGrad)" />
+  <rect width="1200" height="420" fill="url(#techGrid)" />
+  <rect width="1200" height="420" fill="url(#orangeGlow)" />
+  <rect width="1200" height="420" fill="url(#cardGlow)" />
+
+  <!-- Outer Frame -->
+  <rect x="1" y="1" width="1198" height="418" fill="none" stroke="#27272a" stroke-width="1" stroke-opacity="0.6" />
+  <path d="M 0 0 L 40 0 L 0 40 Z" fill="#f97316" fill-opacity="0.3" />
+  <path d="M 1200 420 L 1160 420 L 1200 380 Z" fill="#f97316" fill-opacity="0.3" />
+
+  <!-- LEFT HERO SECTION -->
+  <g transform="translate(80, 75)">
+    <!-- Brand Icon -->
+    <rect x="0" y="0" width="54" height="54" rx="12" fill="#090a0f" stroke="#f97316" stroke-width="1.5" />
+    <path d="M 18 18 L 36 18 L 36 36 L 18 36 Z" fill="none" stroke="#f97316" stroke-width="2" stroke-linejoin="round" />
+    <path d="M 27 12 L 27 18 M 27 36 L 27 42 M 12 27 L 18 27 M 36 27 L 42 27" stroke="#fb923c" stroke-width="2" stroke-linecap="round" />
+    <circle cx="27" cy="27" r="3" fill="#f97316" />
+
+    <!-- Badges Row -->
+    <g transform="translate(70, 8)">
+      <rect x="0" y="0" width="116" height="22" rx="4" fill="#18181b" stroke="#27272a" stroke-width="1" />
+      <circle cx="10" cy="11" r="3" fill="#10b981" />
+      <text x="20" y="15" fill="#a1a1aa" font-family="'JetBrains Mono', monospace" font-size="10" font-weight="600" letter-spacing="1">v1.0.1 STABLE</text>
+
+      <rect x="126" y="0" width="154" height="22" rx="4" fill="#18181b" stroke="#f97316" stroke-width="0.8" stroke-opacity="0.4" />
+      <text x="136" y="15" fill="#fb923c" font-family="'JetBrains Mono', monospace" font-size="10" font-weight="600" letter-spacing="1">ZERO DATA LOSS SUITE</text>
+    </g>
+
+    <!-- Main Title -->
+    <text x="0" y="115" fill="#ffffff" font-family="'Inter', -apple-system, sans-serif" font-size="52" font-weight="800" letter-spacing="-1">
+      RINOVA <tspan fill="url(#brandGrad)">PRO</tspan>
+    </text>
+
+    <!-- Subtitle -->
+    <text x="0" y="150" fill="#a1a1aa" font-family="'JetBrains Mono', monospace" font-size="13" font-weight="500" letter-spacing="1.5">
+      INDUSTRIAL ANDROID DIAGNOSTIC &amp; STORAGE REMEDIATION SUITE
+    </text>
+
+    <!-- Description -->
+    <text x="0" y="185" fill="#71717a" font-family="'Inter', -apple-system, sans-serif" font-size="14" font-weight="400">
+      Deep SQLite partition anomaly auditor, multi-user sandbox inspector,
+    </text>
+    <text x="0" y="206" fill="#71717a" font-family="'Inter', -apple-system, sans-serif" font-size="14" font-weight="400">
+      dynamic heuristic debloater, and atomic chunked in-app update architecture.
+    </text>
+
+    <!-- Author & Architecture Meta -->
+    <g transform="translate(0, 245)">
+      <line x1="0" y1="0" x2="480" y2="0" stroke="#27272a" stroke-width="1" />
+      <text x="0" y="24" fill="#52525b" font-family="'JetBrains Mono', monospace" font-size="11" letter-spacing="1">LEAD ARCHITECT:</text>
+      <text x="120" y="24" fill="#e4e4e7" font-family="'JetBrains Mono', monospace" font-size="11" font-weight="600">SAHAL ARBANI</text>
+      <text x="230" y="24" fill="#52525b" font-family="'JetBrains Mono', monospace" font-size="11">•</text>
+      <text x="245" y="24" fill="#f97316" font-family="'JetBrains Mono', monospace" font-size="11" font-weight="500">TIKTOK @sahal.arbani</text>
+    </g>
+  </g>
+
+  <!-- RIGHT TELEMETRY HUD CARD -->
+  <g transform="translate(680, 55)">
+    <!-- Main Card Body -->
+    <rect x="0" y="0" width="440" height="310" rx="10" fill="#090a0f" stroke="url(#cardBorder)" stroke-width="1.5" />
+
+    <!-- Card Header -->
+    <rect x="0" y="0" width="440" height="38" rx="10" fill="#12131a" />
+    <path d="M 0 38 L 440 38" stroke="#27272a" stroke-width="1" />
+    <circle cx="20" cy="19" r="4" fill="#ef4444" />
+    <circle cx="34" cy="19" r="4" fill="#f59e0b" />
+    <circle cx="48" cy="19" r="4" fill="#10b981" />
+    <text x="68" y="23" fill="#71717a" font-family="'JetBrains Mono', monospace" font-size="11">RinovaPro_Live_Telemetry.sys</text>
+
+    <!-- Telemetry Row 1: Active Target -->
+    <g transform="translate(24, 62)">
+      <text x="0" y="0" fill="#71717a" font-family="'JetBrains Mono', monospace" font-size="10" letter-spacing="1">TARGET INTERFACE</text>
+      <text x="0" y="18" fill="#ffffff" font-family="'JetBrains Mono', monospace" font-size="13" font-weight="700">Samsung Galaxy A05 (SM-A055F)</text>
+      <text x="310" y="18" fill="#10b981" font-family="'JetBrains Mono', monospace" font-size="11" font-weight="600">ONLINE</text>
+    </g>
+
+    <line x1="24" y1="95" x2="416" y2="95" stroke="#18181b" stroke-width="1" />
+
+    <!-- Telemetry Row 2: Vector Audit Matrix -->
+    <g transform="translate(24, 115)">
+      <text x="0" y="0" fill="#71717a" font-family="'JetBrains Mono', monospace" font-size="10" letter-spacing="1">ANOMALY VECTOR 01</text>
+      <text x="0" y="18" fill="#f97316" font-family="'JetBrains Mono', monospace" font-size="12" font-weight="600">MediaStore SQLite external.db Loop</text>
+      <text x="310" y="18" fill="#ef4444" font-family="'JetBrains Mono', monospace" font-size="12" font-weight="700">36.6 GB</text>
+    </g>
+
+    <g transform="translate(24, 155)">
+      <text x="0" y="0" fill="#71717a" font-family="'JetBrains Mono', monospace" font-size="10" letter-spacing="1">ANOMALY VECTOR 02</text>
+      <text x="0" y="18" fill="#a1a1aa" font-family="'JetBrains Mono', monospace" font-size="12">WhatsApp Duplicate Msgstore Backups</text>
+      <text x="310" y="18" fill="#f59e0b" font-family="'JetBrains Mono', monospace" font-size="12" font-weight="700">2.4 GB</text>
+    </g>
+
+    <line x1="24" y1="190" x2="416" y2="190" stroke="#18181b" stroke-width="1" />
+
+    <!-- Remediation Outcome Gauge -->
+    <g transform="translate(24, 210)">
+      <text x="0" y="0" fill="#71717a" font-family="'JetBrains Mono', monospace" font-size="10" letter-spacing="1">REMEDIATION RECLAMATION</text>
+      <rect x="0" y="12" width="392" height="8" rx="4" fill="#18181b" />
+      <rect x="0" y="12" width="330" height="8" rx="4" fill="url(#brandGrad)" />
+      <text x="0" y="38" fill="#10b981" font-family="'JetBrains Mono', monospace" font-size="13" font-weight="700">+35.8 GB RECOVERED</text>
+      <text x="280" y="38" fill="#a1a1aa" font-family="'JetBrains Mono', monospace" font-size="11">0 Photos Lost</text>
+    </g>
+
+    <!-- Sub-status Footer -->
+    <rect x="1" y="270" width="438" height="39" rx="0" fill="#0c0d14" />
+    <path d="M 0 270 L 440 270" stroke="#27272a" stroke-width="1" />
+    <circle cx="20" cy="289" r="3" fill="#0ea5e9" />
+    <text x="32" y="293" fill="#a1a1aa" font-family="'JetBrains Mono', monospace" font-size="10" font-weight="500">ENGINE: PyWebView Core • ADB Daemon 5037 Active</text>
+  </g>
+
+  <!-- Bottom High-Tech Border Accent -->
+  <line x1="0" y1="419" x2="1200" y2="419" stroke="url(#accentLine)" stroke-width="2" />
+</svg>
