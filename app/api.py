@@ -1,0 +1,56 @@
+"""
+Rinova Pro - Unified API Controller
+Exposes deep storage diagnostics and dynamic package inspection
+to both PyWebView and the Web Preview server.
+"""
+
+from typing import Dict, Any, List, Optional
+from core.adb_client import ADBClient
+from core.device import DeviceInspector
+from core.analyzer import StorageAnalyzer
+from core.optimizer import StorageOptimizer
+from core.debloater import Debloater
+
+class RinovaAPI:
+    def __init__(self):
+        self.adb = ADBClient()
+        self.device_inspector = DeviceInspector(self.adb)
+        self.storage_analyzer = StorageAnalyzer(self.adb)
+        self.storage_optimizer = StorageOptimizer(self.adb)
+        self.debloater = Debloater(self.adb)
+
+    def get_devices(self) -> List[Dict[str, Any]]:
+        return self.adb.list_devices()
+
+    def select_device(self, serial: str) -> Dict[str, Any]:
+        self.adb.selected_device = serial
+        return {"success": True, "selected": serial}
+
+    def get_device_info(self, serial: Optional[str] = None) -> Dict[str, Any]:
+        return self.device_inspector.get_info(serial)
+
+    def scan_storage(self, serial: Optional[str] = None) -> Dict[str, Any]:
+        return self.storage_analyzer.analyze(serial)
+
+    def fix_media_storage(self, serial: Optional[str] = None) -> Dict[str, Any]:
+        return self.storage_optimizer.fix_media_storage(serial)
+
+    def list_device_packages(self, serial: Optional[str] = None) -> List[Dict[str, Any]]:
+        """Dynamically scans all real installed packages on device."""
+        return self.debloater.list_all_packages(serial)
+
+    def batch_package_action(self, packages: List[str], action: str, serial: Optional[str] = None) -> Dict[str, Any]:
+        """Bulk disable, enable, or uninstall for user 0."""
+        return self.debloater.batch_execute(packages, action, serial)
+
+    def pair_wireless(self, address_port: str, pairing_code: str) -> Dict[str, Any]:
+        success, message = self.adb.pair_wireless(address_port, pairing_code)
+        return {"success": success, "message": message}
+
+    def connect_wireless(self, address_port: str) -> Dict[str, Any]:
+        success, message = self.adb.connect_wireless(address_port)
+        return {"success": success, "message": message}
+
+    def disconnect_device(self, address_port: Optional[str] = None) -> Dict[str, Any]:
+        success, message = self.adb.disconnect(address_port)
+        return {"success": success, "message": message}

@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Rinova Pro</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/@phosphor-icons/web"></script>
+  <link rel="stylesheet" href="css/style.css">
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              400: '#fb923c',
+              500: '#f97316',
+              600: '#ea580c',
+            },
+            dark: {
+              950: '#000000',
+              900: '#09090b',
+              850: '#111114',
+              800: '#18181b',
+              700: '#27272a',
+              border: '#27272a',
+              borderMuted: '#1f1f23'
+            }
+          }
+        }
+      }
+    }
+  </script>
+</head>
+<body class="bg-dark-950 text-zinc-200 font-sans select-none overflow-hidden h-screen flex flex-col">
+
+  <!-- ================= TOP APP BAR ================= -->
+  <header class="h-14 border-b border-dark-border bg-dark-900/90 backdrop-blur px-6 flex items-center justify-between">
+    <div class="flex items-center gap-8">
+      <div class="flex items-center gap-2.5">
+        <div class="w-7 h-7 rounded-md bg-brand-500 flex items-center justify-center text-white">
+          <i class="ph-bold ph-cpu text-sm"></i>
+        </div>
+        <span class="text-sm font-semibold tracking-tight text-white uppercase">Rinova Pro</span>
+      </div>
+
+      <nav class="flex items-center gap-1 bg-dark-850 p-1 rounded-lg border border-dark-border">
+        <button onclick="switchTab('storage')" id="nav-storage" class="nav-tab px-3.5 py-1.5 rounded-md text-xs font-medium transition-colors duration-150 text-brand-400 bg-dark-800 border border-brand-500/30">
+          Storage
+        </button>
+        <button onclick="switchTab('debloat')" id="nav-debloat" class="nav-tab px-3.5 py-1.5 rounded-md text-xs font-medium transition-colors duration-150 text-zinc-400 hover:text-zinc-200 hover:bg-dark-800/50 border border-transparent">
+          Packages
+        </button>
+        <button onclick="switchTab('wireless')" id="nav-wireless" class="nav-tab px-3.5 py-1.5 rounded-md text-xs font-medium transition-colors duration-150 text-zinc-400 hover:text-zinc-200 hover:bg-dark-800/50 border border-transparent">
+          Wireless ADB
+        </button>
+      </nav>
+    </div>
+
+    <div class="flex items-center gap-3">
+      <div id="device-pill" class="flex items-center gap-2.5 px-3 py-1.5 rounded-md bg-dark-850 border border-dark-border text-xs">
+        <span id="device-dot" class="w-2 h-2 rounded-full bg-zinc-600"></span>
+        <span id="device-text" class="text-zinc-300 font-medium font-mono text-[11px]">DISCONNECTED</span>
+      </div>
+      <button onclick="refreshDeviceList()" class="h-8 px-2.5 rounded-md bg-dark-850 border border-dark-border hover:border-zinc-600 text-zinc-300 text-xs flex items-center gap-1.5 transition-colors">
+        <i class="ph-bold ph-arrows-clockwise text-xs" id="refresh-icon"></i>
+        <span>Scan</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- ================= MAIN VIEWPORT ================= -->
+  <main class="flex-1 overflow-y-auto p-6 space-y-6 bg-dark-950">
+
+    <!-- ================= TAB 1: STORAGE ================= -->
+    <section id="tab-storage" class="tab-pane space-y-5 max-w-5xl mx-auto">
+      
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-3 border-b border-dark-border">
+        <div>
+          <h1 class="text-sm font-semibold uppercase tracking-wider text-white">Partisi Sistem /data</h1>
+          <p class="text-xs text-zinc-400 mt-0.5">Diagnostik kapasitas blok partisi, penggunaan data aplikasi, dan anomali MediaStore.</p>
+        </div>
+        <button onclick="runStorageScan()" id="btn-scan" class="h-8 px-4 rounded-md bg-brand-500 hover:bg-brand-600 text-white font-medium text-xs flex items-center gap-2 transition-colors">
+          <i class="ph-bold ph-magnifying-glass text-xs"></i>
+          <span>Scan Partition</span>
+        </button>
+      </div>
+
+      <!-- Technical Telemetry Cards -->
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div class="p-4 rounded-lg bg-dark-900 border border-dark-border space-y-1">
+          <div class="text-[11px] text-zinc-500 font-medium uppercase tracking-wider">Total Capacity</div>
+          <div id="stat-total" class="text-2xl font-bold font-mono text-white">-- GB</div>
+          <div class="text-[11px] text-zinc-500">Mount: /data (Userdata)</div>
+        </div>
+
+        <div class="p-4 rounded-lg bg-dark-900 border border-dark-border space-y-1">
+          <div class="text-[11px] text-zinc-500 font-medium uppercase tracking-wider">Available Space</div>
+          <div id="stat-free" class="text-2xl font-bold font-mono text-white">-- GB</div>
+          <div id="stat-percent" class="text-[11px] text-zinc-500 font-mono">Usage: --%</div>
+        </div>
+
+        <div class="p-4 rounded-lg bg-dark-900 border border-dark-border space-y-1">
+          <div class="text-[11px] text-zinc-500 font-medium uppercase tracking-wider">MediaStore Database (external.db)</div>
+          <div id="stat-media-bloat" class="text-2xl font-bold font-mono text-zinc-200">-- MB</div>
+          <div id="stat-bloat-note" class="text-[11px] text-zinc-500">Target: com.google.android.providers.media.module</div>
+        </div>
+      </div>
+
+      <!-- Linear Partition Bar -->
+      <div class="p-4 rounded-lg bg-dark-900 border border-dark-border space-y-2">
+        <div class="flex items-center justify-between text-xs font-mono">
+          <span class="text-zinc-400">ALLOCATION MAP</span>
+          <span id="bar-summary-text" class="text-zinc-500 text-[11px]">Ready</span>
+        </div>
+        <div class="w-full h-2 bg-dark-800 rounded overflow-hidden flex gap-0.5">
+          <div id="bar-used" class="bg-zinc-600 h-full" style="width: 0%"></div>
+          <div id="bar-bloat" class="bg-brand-500 h-full" style="width: 0%"></div>
+          <div id="bar-free" class="bg-zinc-800 h-full" style="width: 100%"></div>
+        </div>
+        <div class="flex flex-wrap items-center gap-6 text-[11px] text-zinc-400 pt-1">
+          <div class="flex items-center gap-2">
+            <span class="w-2 h-2 rounded-full bg-zinc-600"></span>
+            <span>App Data & Cache</span>
+          </div>
+          <div class="flex items-center gap-2">
+            <span class="w-2 h-2 rounded-full bg-brand-500"></span>
+            <span>MediaStore Bloat</span>
+          </div>
+          <div class="flex items-center gap-2">
+            <span class="w-2 h-2 rounded-full bg-zinc-800 border border-zinc-700"></span>
+            <span>Free Space</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Optimization Control Box -->
+      <div class="p-4 rounded-lg bg-dark-900 border border-dark-border flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <h2 class="text-xs font-semibold text-white uppercase tracking-wider">MediaStore Database Optimization</h2>
+          <p class="text-xs text-zinc-400 mt-0.5 max-w-xl">
+            Mereset database SQLite external.db dan memicu MediaScanner broadcast. File fisik pengguna (DCIM, Pictures, Documents) tidak terpengaruh.
+          </p>
+        </div>
+        <button onclick="executeSafeFix()" id="btn-fix" class="h-8 px-4 rounded-md bg-brand-500 hover:bg-brand-600 text-white font-medium text-xs flex items-center gap-2 whitespace-nowrap transition-colors">
+          <i class="ph-bold ph-wrench text-xs"></i>
+          <span>Optimize MediaStore</span>
+        </button>
+      </div>
+
+      <!-- Top Packages Table -->
+      <div class="rounded-lg bg-dark-900 border border-dark-border overflow-hidden">
+        <div class="px-4 py-2.5 border-b border-dark-border flex items-center justify-between">
+          <h3 class="text-xs font-semibold uppercase tracking-wider text-zinc-300">Package Data Consumption</h3>
+          <span class="text-[11px] text-zinc-500 font-mono">Top Consumers</span>
+        </div>
+        <div class="overflow-x-auto">
+          <table class="w-full text-left text-xs">
+            <thead class="bg-dark-950 text-zinc-400 border-b border-dark-border text-[11px]">
+              <tr>
+                <th class="py-2.5 px-4 font-medium">Package Identifier</th>
+                <th class="py-2.5 px-4 font-medium text-right font-mono">Data Size (MB)</th>
+                <th class="py-2.5 px-4 font-medium text-right font-mono">Data Size (GB)</th>
+              </tr>
+            </thead>
+            <tbody id="top-apps-tbody" class="divide-y divide-dark-border text-zinc-300">
+              <tr>
+                <td colspan="3" class="py-6 text-center text-zinc-500 italic">No diagnostic data. Click "Scan Partition" to query.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+    </section>
+
+    <!-- ================= TAB 2: PACKAGES (DEBLOAT) ================= -->
+    <section id="tab-debloat" class="tab-pane hidden space-y-5 max-w-5xl mx-auto">
+      
+      <div class="pb-3 border-b border-dark-border flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <h1 class="text-sm font-semibold uppercase tracking-wider text-white">Device Package Manager</h1>
+          <p class="text-xs text-zinc-400 mt-0.5">Daftar paket aktif dan nonaktif yang terinstal di perangkat target via ADB.</p>
+        </div>
+        <button onclick="loadDevicePackages()" id="btn-scan-pkgs" class="h-8 px-3 rounded-md bg-dark-850 border border-dark-border hover:border-zinc-600 text-zinc-200 text-xs font-medium flex items-center gap-2 transition-colors">
+          <i class="ph-bold ph-arrows-clockwise text-xs" id="spin-pkg-icon"></i>
+          <span>Reload Packages</span>
+        </button>
+      </div>
+
+      <!-- Filter & Batch Action Bar -->
+      <div class="p-3.5 rounded-lg bg-dark-900 border border-dark-border space-y-3">
+        <div class="flex flex-col md:flex-row gap-3 items-stretch md:items-center justify-between">
+          <div class="relative flex-1">
+            <i class="ph-bold ph-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500 text-xs"></i>
+            <input id="pkg-search" oninput="filterPackages()" type="text" placeholder="Filter by package ID or keyword..." class="w-full pl-9 pr-3 py-1.5 rounded-md bg-dark-950 border border-dark-border text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-brand-500 font-mono">
+          </div>
+
+          <div class="flex items-center gap-1 bg-dark-950 p-1 rounded-md border border-dark-border text-xs">
+            <button onclick="setCategoryFilter('all')" id="filter-all" class="filter-chip px-3 py-1 rounded text-xs font-medium transition-colors text-brand-400 bg-dark-800 border border-brand-500/30">All</button>
+            <button onclick="setCategoryFilter('suggested')" id="filter-suggested" class="filter-chip px-3 py-1 rounded text-xs font-medium transition-colors text-zinc-400 hover:text-white border border-transparent">Suggested</button>
+            <button onclick="setCategoryFilter('system')" id="filter-system" class="filter-chip px-3 py-1 rounded text-xs font-medium transition-colors text-zinc-400 hover:text-white border border-transparent">System</button>
+            <button onclick="setCategoryFilter('disabled')" id="filter-disabled" class="filter-chip px-3 py-1 rounded text-xs font-medium transition-colors text-zinc-400 hover:text-white border border-transparent">Disabled</button>
+          </div>
+        </div>
+
+        <div class="flex items-center justify-between pt-2 border-t border-dark-border text-xs">
+          <div class="flex items-center gap-3">
+            <label class="flex items-center gap-2 cursor-pointer text-zinc-300">
+              <input type="checkbox" id="check-all" onchange="toggleSelectAll(this.checked)" class="rounded bg-dark-950 border-dark-border text-brand-500 w-3.5 h-3.5 cursor-pointer accent-orange-500">
+              <span class="text-[11px] font-medium">Select All Filtered</span>
+            </label>
+            <span id="selected-counter" class="text-zinc-500 text-[11px] font-mono">0 selected</span>
+          </div>
+
+          <div class="flex items-center gap-2">
+            <button onclick="promptBatchAction('disable')" class="h-7 px-3 rounded bg-dark-850 border border-dark-border hover:border-brand-500/50 text-zinc-200 text-xs font-medium transition-colors">
+              Disable
+            </button>
+            <button onclick="promptBatchAction('enable')" class="h-7 px-3 rounded bg-dark-850 border border-dark-border hover:border-emerald-500/50 text-zinc-200 text-xs font-medium transition-colors">
+              Enable
+            </button>
+            <button onclick="promptBatchAction('uninstall')" class="h-7 px-3 rounded bg-dark-850 border border-dark-border hover:border-rose-500/50 text-rose-400 text-xs font-medium transition-colors">
+              Uninstall (User 0)
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Packages Table -->
+      <div class="rounded-lg bg-dark-900 border border-dark-border overflow-hidden">
+        <div id="pkgs-list" class="divide-y divide-dark-border max-h-[460px] overflow-y-auto">
+          <div class="text-center py-12 text-zinc-500 text-xs italic">
+            Connect device and click "Reload Packages".
+          </div>
+        </div>
+      </div>
+
+    </section>
+
+    <!-- ================= TAB 3: WIRELESS ADB ================= -->
+    <section id="tab-wireless" class="tab-pane hidden space-y-5 max-w-4xl mx-auto">
+      <div class="pb-3 border-b border-dark-border">
+        <h1 class="text-sm font-semibold uppercase tracking-wider text-white">Wireless Debugging (ADB)</h1>
+        <p class="text-xs text-zinc-400 mt-0.5">Konfigurasi pairing dan koneksi nirkabel untuk perangkat Android 11+.</p>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+        <div class="p-4 rounded-lg bg-dark-900 border border-dark-border space-y-3">
+          <div class="flex items-center gap-2">
+            <span class="w-5 h-5 rounded bg-dark-800 text-brand-400 border border-dark-border flex items-center justify-center font-mono font-bold text-xs">1</span>
+            <h2 class="text-xs font-semibold text-white uppercase tracking-wider">Pairing</h2>
+          </div>
+          <p class="text-xs text-zinc-400">
+            Developer Options > Wireless Debugging > Pair device with pairing code.
+          </p>
+
+          <div class="space-y-2.5">
+            <div>
+              <label class="block text-[11px] text-zinc-400 mb-1">Pairing IP & Port</label>
+              <input id="input-pair-address" type="text" placeholder="192.168.1.5:37419" class="w-full px-3 py-1.5 rounded-md bg-dark-950 border border-dark-border text-xs text-white focus:outline-none focus:border-brand-500 font-mono">
+            </div>
+            <div>
+              <label class="block text-[11px] text-zinc-400 mb-1">Pairing Code (6 digits)</label>
+              <input id="input-pair-code" type="text" placeholder="064163" class="w-full px-3 py-1.5 rounded-md bg-dark-950 border border-dark-border text-xs text-white focus:outline-none focus:border-brand-500 font-mono">
+            </div>
+            <button onclick="executePairing()" id="btn-pair" class="w-full h-8 rounded-md bg-brand-500 hover:bg-brand-600 text-white font-medium text-xs transition-colors">
+              Pair Device
+            </button>
+          </div>
+        </div>
+
+        <div class="p-4 rounded-lg bg-dark-900 border border-dark-border space-y-3">
+          <div class="flex items-center gap-2">
+            <span class="w-5 h-5 rounded bg-dark-800 text-brand-400 border border-dark-border flex items-center justify-center font-mono font-bold text-xs">2</span>
+            <h2 class="text-xs font-semibold text-white uppercase tracking-wider">Connect</h2>
+          </div>
+          <p class="text-xs text-zinc-400">
+            Host IP & Main Port from Wireless Debugging screen.
+          </p>
+
+          <div class="space-y-2.5">
+            <div>
+              <label class="block text-[11px] text-zinc-400 mb-1">Host IP & Port</label>
+              <input id="input-connect-address" type="text" placeholder="192.168.1.5:45345" class="w-full px-3 py-1.5 rounded-md bg-dark-950 border border-dark-border text-xs text-white focus:outline-none focus:border-brand-500 font-mono">
+            </div>
+            <div class="pt-3 space-y-2">
+              <button onclick="executeConnect()" id="btn-connect" class="w-full h-8 rounded-md bg-brand-500 hover:bg-brand-600 text-white font-medium text-xs transition-colors">
+                Connect
+              </button>
+              <button onclick="executeDisconnect()" class="w-full h-8 rounded-md bg-dark-850 hover:bg-dark-800 text-zinc-300 border border-dark-border text-xs transition-colors">
+                Disconnect
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Bottom Log Terminal -->
+    <div class="max-w-5xl mx-auto rounded-lg bg-dark-900 border border-dark-border overflow-hidden">
+      <div class="flex items-center justify-between px-4 py-2 border-b border-dark-border text-[11px]">
+        <span class="text-zinc-400 font-medium flex items-center gap-1.5 font-mono">
+          <i class="ph-bold ph-terminal text-brand-500"></i>
+          <span>CONSOLE LOG</span>
+        </span>
+        <button onclick="clearLogs()" class="text-zinc-500 hover:text-zinc-300 text-[10px]">Clear</button>
+      </div>
+      <div id="log-console" class="p-3 h-20 overflow-y-auto font-mono text-[11px] text-zinc-400 space-y-0.5">
+        <div class="text-zinc-500">[System] Initialized. Awaiting target device.</div>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- ================= CONFIRMATION MODAL ================= -->
+  <div id="confirm-modal" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden opacity-0 transition-opacity duration-150">
+    <div class="w-full max-w-md p-5 rounded-lg bg-dark-900 border border-dark-border shadow-2xl space-y-3.5">
+      <div>
+        <h3 id="modal-title" class="text-sm font-semibold text-white">Confirm Execution</h3>
+        <p id="modal-subtitle" class="text-xs text-zinc-400 mt-0.5">Targeted command will be dispatched via ADB.</p>
+      </div>
+
+      <div class="p-3 rounded bg-dark-950 border border-dark-border text-xs space-y-1.5">
+        <div class="flex items-center justify-between text-zinc-400 text-[11px]">
+          <span>Selected Packages:</span>
+          <span id="modal-pkg-count" class="font-mono font-semibold text-white">0</span>
+        </div>
+        <div id="modal-pkg-preview" class="max-h-28 overflow-y-auto font-mono text-[10px] text-zinc-400 space-y-0.5"></div>
+      </div>
+
+      <p id="modal-warning-text" class="text-xs text-zinc-400 leading-relaxed"></p>
+
+      <div class="flex items-center justify-end gap-2 pt-2">
+        <button onclick="closeConfirmModal()" class="h-8 px-3 rounded-md text-xs font-medium bg-dark-850 hover:bg-dark-800 text-zinc-300 border border-dark-border transition-colors">
+          Cancel
+        </button>
+        <button id="modal-btn-confirm" onclick="executeBatchActionConfirmed()" class="h-8 px-4 rounded-md text-xs font-medium bg-brand-500 hover:bg-brand-600 text-white transition-colors">
+          Execute
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast -->
+  <div id="toast" class="fixed bottom-6 right-6 px-4 py-2.5 rounded-lg bg-dark-900 border border-dark-border text-white text-xs shadow-xl flex items-center gap-2 transform translate-y-16 opacity-0 transition-all duration-200 z-50 pointer-events-none">
+    <i id="toast-icon" class="ph-bold ph-check text-emerald-400"></i>
+    <span id="toast-msg">Notification</span>
+  </div>
+
+  <script src="js/app.js"></script>
+</body>
+</html>
