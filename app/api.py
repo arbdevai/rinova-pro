@@ -1,7 +1,5 @@
 """
 Rinova Pro - Unified API Controller
-Exposes deep storage diagnostics and dynamic package inspection
-to both PyWebView and the Web Preview server.
 """
 
 from typing import Dict, Any, List, Optional
@@ -32,15 +30,13 @@ class RinovaAPI:
     def scan_storage(self, serial: Optional[str] = None) -> Dict[str, Any]:
         return self.storage_analyzer.analyze(serial)
 
-    def fix_media_storage(self, serial: Optional[str] = None) -> Dict[str, Any]:
-        return self.storage_optimizer.fix_media_storage(serial)
+    def execute_remediation(self, vector_ids: List[str], serial: Optional[str] = None) -> Dict[str, Any]:
+        return self.storage_optimizer.execute_remediation(vector_ids, serial)
 
     def list_device_packages(self, serial: Optional[str] = None) -> List[Dict[str, Any]]:
-        """Dynamically scans all real installed packages on device."""
         return self.debloater.list_all_packages(serial)
 
     def batch_package_action(self, packages: List[str], action: str, serial: Optional[str] = None) -> Dict[str, Any]:
-        """Bulk disable, enable, or uninstall for user 0."""
         return self.debloater.batch_execute(packages, action, serial)
 
     def pair_wireless(self, address_port: str, pairing_code: str) -> Dict[str, Any]:

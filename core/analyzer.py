@@ -1,7 +1,12 @@
 """
-Rinova Pro - Deep Storage Analyzer
-Scans physical partitions, inspects MediaProvider SQLite databases,
-and discovers hidden storage leaks without risking user files.
+Rinova Pro - Multi-Vector Storage Diagnostic Engine
+Performs comprehensive multi-sector audits across:
+1. MediaStore SQLite Database (external.db bloat)
+2. Multi-User / Work Profile / Dual Messenger partitions (User 10, 150, 999)
+3. WhatsApp Redundant Local Backup Accumulation (7-day duplicate db.crypt)
+4. Recycle Bin & Temporary Thumbnail Cache (.Trash / .thumbnails)
+5. Telegram Streaming Cache Accumulation
+6. System Dumpstate & Tombstone Crash Logs
 """
 
 import json
@@ -14,13 +19,10 @@ class StorageAnalyzer:
         self.adb = adb
 
     def analyze(self, serial: Optional[str] = None) -> Dict[str, Any]:
-        """Performs full storage audit on /data and analyzes potential SQLite bloats."""
+        """Runs full multi-vector diagnostic audit on target device."""
         # 1. Query physical partition stats via df
         code, df_out, _ = self.adb.shell("df -k /data", target_device=serial)
-        total_kb = 0
-        used_kb = 0
-        free_kb = 0
-        percent_used = 0
+        total_kb = used_kb = free_kb = percent_used = 0
 
         if code == 0:
             lines = df_out.strip().splitlines()
@@ -40,38 +42,40 @@ class StorageAnalyzer:
         used_gb = round(used_kb / (1024 * 1024), 2)
         free_gb = round(free_kb / (1024 * 1024), 2)
 
-        # 2. Query diskstats to get breakdown by packages
-        code, diskstats_out, _ = self.adb.shell("dumpsys diskstats", target_device=serial, timeout=10)
-        app_sizes = self._parse_diskstats(diskstats_out)
+        # 2. Vector Audits
+        findings: List[Dict[str, Any]] = []
 
-        # 3. Specifically inspect MediaProvider database bloat
-        media_db_info = self._check_media_provider_db(serial)
+        # Vector 1: MediaStore Database SQLite Bloat
+        v1 = self._audit_mediastore(serial)
+        findings.append(v1)
 
-        # 4. Formulate diagnostic verdict
-        status = "HEALTHY"
-        status_message = "Kondisi penyimpanan dalam batas normal."
-        status_color = "#10b981" # Green
+        # Vector 2: Multi-User / Dual Space / Knox Profile Check
+        v2 = self._audit_multiuser(serial)
+        findings.append(v2)
 
-        media_bloat_detected = False
-        reclaimable_gb = 0.0
+        # Vector 3: WhatsApp Duplicate Local Backups Check
+        v3 = self._audit_whatsapp_backups(serial)
+        findings.append(v3)
 
-        if media_db_info.get("external_db_mb", 0) > 1000: # > 1 GB is definitely bloated
-            media_bloat_detected = True
-            reclaimable_gb = round(media_db_info["external_db_mb"] / 1024, 2)
-            status = "CRITICAL_MEDIA_BLOAT"
-            status_message = (
-                f"Ditemukan kerusakan database Media Storage ({reclaimable_gb} GB)! "
-                f"Penyimpanan bisa dipulihkan tanpa menghapus foto/video."
-            )
-            status_color = "#ef4444" # Red
-        elif percent_used >= 95:
-            status = "STORAGE_ALMOST_FULL"
-            status_message = f"Penyimpanan kritis ({percent_used}% terpakai), sisa hanya {free_gb} GB."
-            status_color = "#f59e0b" # Amber
-        elif percent_used >= 85:
-            status = "STORAGE_WARNING"
-            status_message = f"Penyimpanan mulai menipis ({percent_used}% terpakai)."
-            status_color = "#f59e0b"
+        # Vector 4: Gallery & Storage Trash Retention
+        v4 = self._audit_recycle_bin(serial)
+        findings.append(v4)
+
+        # Vector 5: Telegram Streaming Cache
+        v5 = self._audit_telegram_cache(serial)
+        findings.append(v5)
+
+        # Vector 6: Crash Logs & Dumpstate
+        v6 = self._audit_crash_logs(serial)
+        findings.append(v6)
+
+        # Calculate total reclaimable space
+        total_reclaimable_mb = sum(f["size_mb"] for f in findings if f["reclaimable"])
+        total_reclaimable_gb = round(total_reclaimable_mb / 1024, 2)
+
+        # 3. Query top consuming packages via dumpsys diskstats
+        _, diskstats_out, _ = self.adb.shell("dumpsys diskstats", target_device=serial, timeout=8)
+        top_apps = self._parse_diskstats(diskstats_out)
 
         return {
             "partition": {
@@ -80,15 +84,204 @@ class StorageAnalyzer:
                 "free_gb": free_gb,
                 "percent_used": percent_used,
             },
-            "status": status,
-            "status_message": status_message,
-            "status_color": status_color,
-            "media_bloat": {
-                "detected": media_bloat_detected,
-                "reclaimable_gb": reclaimable_gb,
-                "details": media_db_info
-            },
-            "top_apps": app_sizes[:10]
+            "findings": findings,
+            "total_reclaimable_gb": total_reclaimable_gb,
+            "top_apps": top_apps[:10]
+        }
+
+    def _audit_mediastore(self, serial: Optional[str]) -> Dict[str, Any]:
+        """Vector 1: Checks external.db size in MediaProvider."""
+        code, out, _ = self.adb.shell(
+            "dumpsys meminfo com.google.android.providers.media.module",
+            target_device=serial,
+            timeout=8
+        )
+        db_kb = 0
+        if code == 0 and out:
+            match = re.search(r"(\d+)\s+.*external\.db", out)
+            if match:
+                try:
+                    db_kb = int(match.group(1))
+                except ValueError:
+                    pass
+
+        mb = round(db_kb / 1024, 2)
+        gb = round(mb / 1024, 2)
+        is_bloated = mb > 1000 # > 1 GB is considered bloated
+
+        return {
+            "id": "mediastore_bloat",
+            "title": "MediaStore SQLite Database Bloat",
+            "target": "/data/user/0/com.google.android.providers.media.module/databases/external.db",
+            "size_mb": mb,
+            "size_gb": gb,
+            "reclaimable": is_bloated,
+            "severity": "CRITICAL" if is_bloated else "CLEAN",
+            "note": "Indeks SQLite membengkak akibat loop transaksi. Reset aman tanpa menghapus file media fisik." if is_bloated else "Ukuran database SQLite berada pada batas normal."
+        }
+
+    def _audit_multiuser(self, serial: Optional[str]) -> Dict[str, Any]:
+        """Vector 2: Checks secondary profiles (Dual Apps / Knox / Second Space)."""
+        code, out, _ = self.adb.shell("pm list users", target_device=serial)
+        user_list = []
+        has_secondary = False
+
+        if code == 0 and out:
+            for line in out.splitlines():
+                match = re.search(r"UserInfo\{(\d+):([^:]+):", line)
+                if match:
+                    uid = int(match.group(1))
+                    uname = match.group(2)
+                    user_list.append({"uid": uid, "name": uname})
+                    if uid != 0:
+                        has_secondary = True
+
+        note = f"Ditemukan {len(user_list)} profil aktif ({', '.join(u['name'] for u in user_list)})." if has_secondary else "Hanya profil utama (User 0) yang aktif."
+
+        return {
+            "id": "multi_user",
+            "title": "Secondary User Profiles (Dual Apps / Knox / Work Space)",
+            "target": "UserHandle partitions (/data/user/*)",
+            "size_mb": 0.0,
+            "size_gb": 0.0,
+            "reclaimable": False, # Requires manual technician review
+            "severity": "INFO" if has_secondary else "CLEAN",
+            "note": note,
+            "user_list": user_list
+        }
+
+    def _audit_whatsapp_backups(self, serial: Optional[str]) -> Dict[str, Any]:
+        """Vector 3: Checks accumulation of redundant local WhatsApp daily backups."""
+        check_cmd = (
+            "ls -l /storage/emulated/0/Android/media/com.whatsapp/WhatsApp/Databases/msgstore-*.db.crypt* 2>/dev/null || "
+            "ls -l /storage/emulated/0/WhatsApp/Databases/msgstore-*.db.crypt* 2>/dev/null"
+        )
+        code, out, _ = self.adb.shell(check_cmd, target_device=serial)
+        files = []
+        total_bytes = 0
+
+        if code == 0 and out:
+            lines = [l.strip() for l in out.splitlines() if l.strip() and not l.startswith("ls:")]
+            for line in lines:
+                parts = line.split()
+                if len(parts) >= 5:
+                    try:
+                        sz = int(parts[4])
+                        total_bytes += sz
+                        files.append(parts[-1])
+                    except ValueError:
+                        pass
+
+        # If there are multiple daily backup files (keep newest, prune older)
+        redundant_count = max(0, len(files) - 1)
+        reclaimable_mb = 0.0
+        if len(files) > 1 and total_bytes > 0:
+            # Approximate redundant size (pro-rated by file count)
+            reclaimable_mb = round(((total_bytes / len(files)) * redundant_count) / (1024 * 1024), 2)
+
+        reclaimable_gb = round(reclaimable_mb / 1024, 2)
+        has_redundant = redundant_count > 0
+
+        return {
+            "id": "wa_backups",
+            "title": "WhatsApp Redundant Local Backups",
+            "target": ".../WhatsApp/Databases/msgstore-YYYY-MM-DD.db.crypt*",
+            "size_mb": reclaimable_mb,
+            "size_gb": reclaimable_gb,
+            "reclaimable": has_redundant and reclaimable_mb > 50,
+            "severity": "HIGH" if reclaimable_mb > 500 else ("MEDIUM" if has_redundant else "CLEAN"),
+            "note": f"Ditemukan {len(files)} backup harian. {redundant_count} backup usang dapat dibersihkan dengan menyisakan 1 backup terbaru." if has_redundant else "Tidak ada akumulasi backup duplikat WhatsApp."
+        }
+
+    def _audit_recycle_bin(self, serial: Optional[str]) -> Dict[str, Any]:
+        """Vector 4: Checks Gallery / Storage Recycle Bin (.Trash & .thumbnails)."""
+        check_cmd = (
+            "du -sk /storage/emulated/0/Android/.Trash 2>/dev/null; "
+            "du -sk /storage/emulated/0/DCIM/.thumbnails 2>/dev/null; "
+            "du -sk /storage/emulated/0/Pictures/.thumbnails 2>/dev/null"
+        )
+        code, out, _ = self.adb.shell(check_cmd, target_device=serial)
+        total_kb = 0
+
+        if code == 0 and out:
+            for line in out.splitlines():
+                parts = line.strip().split()
+                if len(parts) >= 2:
+                    try:
+                        total_kb += int(parts[0])
+                    except ValueError:
+                        pass
+
+        mb = round(total_kb / 1024, 2)
+        gb = round(mb / 1024, 2)
+        has_trash = mb > 100
+
+        return {
+            "id": "recycle_bin",
+            "title": "Recycle Bin & Thumbnail Cache (.Trash / .thumbnails)",
+            "target": "/sdcard/Android/.Trash & DCIM/.thumbnails",
+            "size_mb": mb,
+            "size_gb": gb,
+            "reclaimable": has_trash,
+            "severity": "MEDIUM" if has_trash else "CLEAN",
+            "note": "File sampah yang mengendap di Recycle Bin dan cache thumbnail usang." if has_trash else "Recycle Bin dan thumbnail cache dalam kondisi bersih."
+        }
+
+    def _audit_telegram_cache(self, serial: Optional[str]) -> Dict[str, Any]:
+        """Vector 5: Checks Telegram unlimited media cache."""
+        check_cmd = "du -sk /storage/emulated/0/Android/data/org.telegram.messenger/cache 2>/dev/null"
+        code, out, _ = self.adb.shell(check_cmd, target_device=serial)
+        kb = 0
+        if code == 0 and out:
+            parts = out.strip().split()
+            if len(parts) >= 2:
+                try:
+                    kb = int(parts[0])
+                except ValueError:
+                    pass
+
+        mb = round(kb / 1024, 2)
+        gb = round(mb / 1024, 2)
+        has_cache = mb > 200
+
+        return {
+            "id": "telegram_cache",
+            "title": "Telegram Streaming & Video Cache",
+            "target": "/sdcard/Android/data/org.telegram.messenger/cache",
+            "size_mb": mb,
+            "size_gb": gb,
+            "reclaimable": has_cache,
+            "severity": "HIGH" if mb > 1000 else ("MEDIUM" if has_cache else "CLEAN"),
+            "note": "Cache streaming video dan file sementara Telegram." if has_cache else "Cache media Telegram dalam batas wajar."
+        }
+
+    def _audit_crash_logs(self, serial: Optional[str]) -> Dict[str, Any]:
+        """Vector 6: Checks crash tombstones and system logs (/data/log, /data/tombstones)."""
+        check_cmd = "du -sk /data/tombstones 2>/dev/null; du -sk /data/log 2>/dev/null"
+        code, out, _ = self.adb.shell(check_cmd, target_device=serial)
+        kb = 0
+        if code == 0 and out:
+            for line in out.splitlines():
+                parts = line.strip().split()
+                if len(parts) >= 2:
+                    try:
+                        kb += int(parts[0])
+                    except ValueError:
+                        pass
+
+        mb = round(kb / 1024, 2)
+        gb = round(mb / 1024, 2)
+        has_logs = mb > 50
+
+        return {
+            "id": "crash_logs",
+            "title": "System Crash Dumps & Logcat (SysDump / Tombstones)",
+            "target": "/data/tombstones & /data/log",
+            "size_mb": mb,
+            "size_gb": gb,
+            "reclaimable": has_logs,
+            "severity": "MEDIUM" if has_logs else "CLEAN",
+            "note": "Log crash dumpstate sistem yang menumpuk di partisi /data." if has_logs else "Log sistem dalam kondisi normal."
         }
 
     def _parse_diskstats(self, content: str) -> List[Dict[str, Any]]:
@@ -119,30 +312,3 @@ class StorageAnalyzer:
             return results
         except Exception:
             return []
-
-    def _check_media_provider_db(self, serial: Optional[str] = None) -> Dict[str, Any]:
-        """Inspects com.google.android.providers.media.module memory and DB size."""
-        code, out, _ = self.adb.shell(
-            "dumpsys meminfo com.google.android.providers.media.module",
-            target_device=serial,
-            timeout=8
-        )
-        if code != 0 or not out:
-            return {"found": False, "external_db_mb": 0}
-
-        external_db_kb = 0
-        match = re.search(r"(\d+)\s+.*external\.db", out)
-        if match:
-            try:
-                external_db_kb = int(match.group(1))
-            except ValueError:
-                pass
-
-        mb = round(external_db_kb / 1024, 2)
-        gb = round(mb / 1024, 2)
-        return {
-            "found": external_db_kb > 0,
-            "external_db_kb": external_db_kb,
-            "external_db_mb": mb,
-            "external_db_gb": gb
-        }

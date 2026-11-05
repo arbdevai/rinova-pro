@@ -44,8 +44,8 @@ class RinovaRequestHandler(SimpleHTTPRequestHandler):
                 response_data = api.get_device_info(payload.get("serial"))
             elif path == "/api/scan-storage":
                 response_data = api.scan_storage(payload.get("serial"))
-            elif path == "/api/fix-media-storage":
-                response_data = api.fix_media_storage(payload.get("serial"))
+            elif path == "/api/execute-remediation":
+                response_data = api.execute_remediation(payload.get("vector_ids", []), payload.get("serial"))
             elif path == "/api/list-device-packages":
                 response_data = api.list_device_packages(payload.get("serial"))
             elif path == "/api/batch-package-action":

@@ -29,8 +29,8 @@ class DesktopAPIBridge:
     def scan_storage(self, payload):
         return self.api.scan_storage(payload.get("serial"))
 
-    def fix_media_storage(self, payload):
-        return self.api.fix_media_storage(payload.get("serial"))
+    def execute_remediation(self, payload):
+        return self.api.execute_remediation(payload.get("vector_ids", []), payload.get("serial"))
 
     def list_device_packages(self, payload=None):
         serial = payload.get("serial") if payload else None
@@ -79,7 +79,7 @@ def main():
         bridge.select_device,
         bridge.get_device_info,
         bridge.scan_storage,
-        bridge.fix_media_storage,
+        bridge.execute_remediation,
         bridge.list_device_packages,
         bridge.batch_package_action,
         bridge.pair_wireless,

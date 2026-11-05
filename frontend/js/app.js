@@ -1,12 +1,14 @@
 /**
- * Rinova Pro - Professional Diagnostics & Package Manager Controller
+ * Rinova Pro - Professional Diagnostics & Multi-Vector Engine Controller
  */
 
 const state = {
   activeTab: 'storage',
   activeDevice: null,
   isScanning: false,
-  isFixing: false,
+  isRemediating: false,
+  findings: [],
+  selectedFindings: new Set(),
   packages: [],
   filteredPackages: [],
   selectedPackages: new Set(),
@@ -144,47 +146,41 @@ async function refreshDeviceList() {
   }
 }
 
-// ================= STORAGE ANALYSIS =================
+// ================= MULTI-VECTOR STORAGE ANALYSIS =================
 async function runStorageScan() {
   if (state.isScanning) return;
   state.isScanning = true;
 
   const btn = document.getElementById('btn-scan');
-  btn.innerHTML = '<i class="ph-bold ph-spinner animate-spin text-xs"></i><span>Scanning...</span>';
+  btn.innerHTML = '<i class="ph-bold ph-spinner animate-spin text-xs"></i><span>Running Audit...</span>';
   btn.disabled = true;
 
-  log('Executing df and dumpsys diskstats queries...', 'info');
+  log('Executing multi-vector storage audit across all sectors...', 'info');
 
   try {
     const data = await callApi('/api/scan-storage', { serial: state.activeDevice });
     state.isScanning = false;
-    btn.innerHTML = '<i class="ph-bold ph-magnifying-glass text-xs"></i><span>Scan Partition</span>';
+    btn.innerHTML = '<i class="ph-bold ph-magnifying-glass text-xs"></i><span>Run Full Audit</span>';
     btn.disabled = false;
 
     const part = data.partition || {};
-    const mediaBloat = data.media_bloat || {};
+    state.findings = data.findings || [];
+
+    // Reset selection to all reclaimable findings
+    state.selectedFindings.clear();
+    state.findings.forEach(f => {
+      if (f.reclaimable) state.selectedFindings.add(f.id);
+    });
 
     document.getElementById('stat-total').textContent = `${part.total_gb || '--'} GB`;
     document.getElementById('stat-free').textContent = `${part.free_gb || '--'} GB`;
     document.getElementById('stat-percent').textContent = `Usage: ${part.percent_used || 0}%`;
+    document.getElementById('stat-reclaimable').textContent = `${data.total_reclaimable_gb || 0.0} GB`;
+    document.getElementById('stat-reclaimable-note').textContent = `${state.selectedFindings.size} anomali dapat dipulihkan`;
 
-    const bloatStat = document.getElementById('stat-media-bloat');
-    const bloatNote = document.getElementById('stat-bloat-note');
-
-    if (mediaBloat.detected) {
-      bloatStat.className = 'text-2xl font-bold font-mono text-brand-400';
-      bloatStat.textContent = `${mediaBloat.reclaimable_gb} GB`;
-      bloatNote.textContent = 'Status: Anomaly Detected (Reclaimable)';
-      log(`Diagnostic: external.db anomaly identified (${mediaBloat.reclaimable_gb} GB).`, 'warn');
-    } else {
-      bloatStat.className = 'text-2xl font-bold font-mono text-emerald-400';
-      bloatStat.textContent = `${mediaBloat.details?.external_db_mb || 0} MB`;
-      bloatNote.textContent = 'Status: Normal';
-    }
-
-    // Allocation bar
+    // Linear bar
     const total = part.total_gb || 1;
-    const bloatGb = mediaBloat.reclaimable_gb || 0;
+    const bloatGb = data.total_reclaimable_gb || 0;
     const usedGb = Math.max(0, (part.used_gb || 0) - bloatGb);
     const freeGb = part.free_gb || 0;
 
@@ -198,6 +194,10 @@ async function runStorageScan() {
 
     document.getElementById('bar-summary-text').textContent = 
       `Used: ${(part.used_gb || 0).toFixed(1)} GB | Free: ${freeGb.toFixed(1)} GB`;
+
+    // Render Diagnostic Finding Matrix
+    renderFindingsMatrix();
+    updateSelectedReclaimText();
 
     // Render top apps
     const tbody = document.getElementById('top-apps-tbody');
@@ -222,45 +222,120 @@ async function runStorageScan() {
       });
     }
 
-    log(`Partition scan complete: ${part.free_gb} GB available.`, 'success');
-    showToast('Scan complete');
+    log(`Multi-vector audit complete: Total ${data.total_reclaimable_gb} GB reclaimable identified.`, 'success');
+    showToast('Audit complete');
   } catch (err) {
     state.isScanning = false;
-    btn.innerHTML = '<i class="ph-bold ph-magnifying-glass text-xs"></i><span>Scan Partition</span>';
+    btn.innerHTML = '<i class="ph-bold ph-magnifying-glass text-xs"></i><span>Run Full Audit</span>';
     btn.disabled = false;
-    log('Scan failed: ' + err.message, 'error');
-    showToast('Scan failed', 'error');
+    log('Audit error: ' + err.message, 'error');
+    showToast('Audit failed', 'error');
   }
 }
 
-// Media Optimization
-async function executeSafeFix() {
-  if (state.isFixing) return;
-  state.isFixing = true;
+function renderFindingsMatrix() {
+  const container = document.getElementById('findings-container');
+  container.innerHTML = '';
 
-  const btn = document.getElementById('btn-fix');
-  btn.innerHTML = '<i class="ph-bold ph-spinner animate-spin text-xs"></i><span>Optimizing...</span>';
+  if (state.findings.length === 0) {
+    container.innerHTML = '<div class="text-center py-8 text-zinc-500 text-xs italic">No findings available.</div>';
+    return;
+  }
+
+  state.findings.forEach(f => {
+    const card = document.createElement('div');
+    const isSelected = state.selectedFindings.has(f.id);
+
+    let badgeClass = 'bg-zinc-800 text-zinc-400 border-zinc-700';
+    if (f.severity === 'CRITICAL') badgeClass = 'bg-rose-500/10 text-rose-400 border-rose-500/30';
+    if (f.severity === 'HIGH') badgeClass = 'bg-brand-500/10 text-brand-400 border-brand-500/30';
+    if (f.severity === 'MEDIUM') badgeClass = 'bg-amber-500/10 text-amber-400 border-amber-500/30';
+    if (f.severity === 'INFO') badgeClass = 'bg-sky-500/10 text-sky-400 border-sky-500/30';
+
+    card.className = `p-3 rounded-md bg-dark-950 border ${f.reclaimable ? 'border-dark-border hover:border-zinc-700' : 'border-dark-border opacity-70'} transition`;
+
+    card.innerHTML = `
+      <div class="flex items-start justify-between gap-3">
+        <div class="flex items-start gap-3">
+          <input type="checkbox" ${isSelected ? 'checked' : ''} ${f.reclaimable ? '' : 'disabled'} onchange="toggleSelectFinding('${f.id}', this.checked)" class="rounded bg-dark-900 border-dark-border text-brand-500 w-3.5 h-3.5 mt-0.5 cursor-pointer accent-orange-500">
+          <div class="space-y-0.5">
+            <div class="flex items-center gap-2">
+              <span class="text-xs font-semibold text-white">${f.title}</span>
+              <span class="px-1.5 py-0.5 rounded text-[10px] font-mono font-medium border ${badgeClass}">${f.severity}</span>
+            </div>
+            <div class="text-[11px] font-mono text-zinc-500">${f.target}</div>
+            <div class="text-xs text-zinc-400 pt-0.5">${f.note}</div>
+          </div>
+        </div>
+        <div class="text-right whitespace-nowrap pl-2">
+          <div class="text-xs font-mono font-bold ${f.reclaimable ? 'text-brand-400' : 'text-zinc-500'}">
+            ${f.size_gb > 0 ? f.size_gb + ' GB' : f.size_mb + ' MB'}
+          </div>
+          <div class="text-[10px] text-zinc-500 font-mono">${f.reclaimable ? 'Reclaimable' : 'Static'}</div>
+        </div>
+      </div>
+    `;
+    container.appendChild(card);
+  });
+}
+
+function toggleSelectFinding(findingId, checked) {
+  if (checked) {
+    state.selectedFindings.add(findingId);
+  } else {
+    state.selectedFindings.delete(findingId);
+  }
+  updateSelectedReclaimText();
+}
+
+function updateSelectedReclaimText() {
+  let selectedMb = 0;
+  state.findings.forEach(f => {
+    if (state.selectedFindings.has(f.id)) {
+      selectedMb += f.size_mb;
+    }
+  });
+  const selectedGb = (selectedMb / 1024).toFixed(2);
+  document.getElementById('selected-reclaim-text').textContent = `Selected: ${selectedGb} GB (${state.selectedFindings.size} vectors)`;
+}
+
+// Multi-Vector Remediation Execution
+async function executeSelectedRemediation() {
+  if (state.selectedFindings.size === 0) {
+    showToast('Select at least one reclaimable vector', 'warn');
+    return;
+  }
+  if (state.isRemediating) return;
+  state.isRemediating = true;
+
+  const btn = document.getElementById('btn-remediate');
+  btn.innerHTML = '<i class="ph-bold ph-spinner animate-spin text-xs"></i><span>Executing...</span>';
   btn.disabled = true;
 
-  log('Resetting MediaProvider database and dispatching MediaScanner broadcast...', 'info');
+  const vectorIds = Array.from(state.selectedFindings);
+  log(`Executing targeted remediation on ${vectorIds.length} vectors: ${vectorIds.join(', ')}...`, 'info');
 
   try {
-    const res = await callApi('/api/fix-media-storage', { serial: state.activeDevice });
-    state.isFixing = false;
-    btn.innerHTML = '<i class="ph-bold ph-wrench text-xs"></i><span>Optimize MediaStore</span>';
+    const res = await callApi('/api/execute-remediation', {
+      vector_ids: vectorIds,
+      serial: state.activeDevice
+    });
+
+    state.isRemediating = false;
+    btn.innerHTML = '<i class="ph-bold ph-lightning text-xs"></i><span>Execute Remediation</span>';
     btn.disabled = false;
 
     if (res.success) {
-      log(`Operation success: Reclaimed ${res.reclaimed_gb} GB storage space.`, 'success');
-      showToast(`Reclaimed +${res.reclaimed_gb} GB`, 'success');
+      log(res.message, 'success');
+      showToast(`Remediation complete (+${res.reclaimed_gb} GB)`, 'success');
       setTimeout(runStorageScan, 1500);
     } else {
-      log('Optimization failure: ' + res.error, 'error');
-      showToast('Optimization failed', 'error');
+      log('Remediation error occurred.', 'error');
+      showToast('Remediation incomplete', 'error');
     }
   } catch (err) {
-    state.isFixing = false;
-    btn.innerHTML = '<i class="ph-bold ph-wrench text-xs"></i><span>Optimize MediaStore</span>';
+    state.isRemediating = false;
+    btn.innerHTML = '<i class="ph-bold ph-lightning text-xs"></i><span>Execute Remediation</span>';
     btn.disabled = false;
     log('System error: ' + err.message, 'error');
   }
