@@ -88,7 +88,7 @@ function showToast(message, type = 'success') {
 // Tab navigation
 function switchTab(tabName) {
   state.activeTab = tabName;
-  ['storage', 'debloat', 'wireless'].forEach(t => {
+  ['storage', 'debloat', 'wireless', 'tutorial'].forEach(t => {
     const pane = document.getElementById(`tab-${t}`);
     const nav = document.getElementById(`nav-${t}`);
     const isSelected = (t === tabName);
