@@ -42,7 +42,7 @@ Lalu buka di browser HP / PC: `http://localhost:8080`
 ## 👨‍💻 Lead Architect & Creator
 
 **Sahal Arbani**  
-- **TikTok Portfolio:** [@saha.arbani](https://www.tiktok.com/@saha.arbani)
+- **TikTok Portfolio:** [@sahal.arbani](https://www.tiktok.com/@sahal.arbani)
 - **Role:** Systems & Reverse Engineering, Android Internal Diagnostics Suite
 - **Engineering Highlights:** Solusi pemulihan 36+ GB database SQLite MediaStore terkorupsi, non-destructive storage remediation, dynamic ADB heuristics.
 
