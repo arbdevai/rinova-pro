@@ -39,6 +39,15 @@ Lalu buka di browser HP / PC: `http://localhost:8080`
 
 ---
 
+## 👨‍💻 Lead Architect & Creator
+
+**Sahal Arbani**  
+- **TikTok Portfolio:** [@saha.arbani](https://www.tiktok.com/@saha.arbani)
+- **Role:** Systems & Reverse Engineering, Android Internal Diagnostics Suite
+- **Engineering Highlights:** Solusi pemulihan 36+ GB database SQLite MediaStore terkorupsi, non-destructive storage remediation, dynamic ADB heuristics.
+
+---
+
 ## 📦 Cara Build Menjadi File `.exe` via GitHub Actions
 
 Tidak perlu kompilasi di laptop lokal Anda! GitHub Actions akan melakukan kompilasi otomatis di cloud Windows resmi Microsoft:

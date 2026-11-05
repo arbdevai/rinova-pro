@@ -784,7 +784,7 @@ function closeUpdateModal() {
 
 // Initializer
 window.addEventListener('DOMContentLoaded', () => {
-  log('Rinova Pro initialized.', 'info');
+  log('Rinova Pro Engine v1.0.0 initialized — Lead Architect: Sahal Arbani (@saha.arbani)', 'brand');
   refreshDeviceList();
   initHeartbeat();
   checkAppUpdate();
