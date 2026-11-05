@@ -268,6 +268,7 @@
             <button onclick="setCategoryFilter('suggested')" id="filter-suggested" class="filter-chip px-3 py-1 rounded text-xs font-medium transition-colors text-zinc-400 hover:text-white border border-transparent">Suggested</button>
             <button onclick="setCategoryFilter('system')" id="filter-system" class="filter-chip px-3 py-1 rounded text-xs font-medium transition-colors text-zinc-400 hover:text-white border border-transparent">System</button>
             <button onclick="setCategoryFilter('disabled')" id="filter-disabled" class="filter-chip px-3 py-1 rounded text-xs font-medium transition-colors text-zinc-400 hover:text-white border border-transparent">Disabled</button>
+            <button onclick="setCategoryFilter('uninstalled')" id="filter-uninstalled" class="filter-chip px-3 py-1 rounded text-xs font-medium transition-colors text-zinc-400 hover:text-white border border-transparent">Uninstalled</button>
           </div>
         </div>
 
@@ -289,6 +290,9 @@
             </button>
             <button onclick="promptBatchAction('uninstall')" class="h-7 px-3 rounded bg-dark-850 border border-dark-border hover:border-rose-500/50 text-rose-400 text-xs font-medium transition-colors">
               Uninstall (User 0)
+            </button>
+            <button onclick="promptBatchAction('restore')" class="h-7 px-3 rounded bg-dark-850 border border-dark-border hover:border-emerald-500/50 text-emerald-400 text-xs font-medium transition-colors">
+              Restore
             </button>
           </div>
         </div>

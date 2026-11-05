@@ -498,8 +498,9 @@ async function loadDevicePackages() {
 
 function setCategoryFilter(filterKey) {
   state.activeFilter = filterKey;
-  ['all', 'suggested', 'system', 'disabled'].forEach(f => {
+  ['all', 'suggested', 'system', 'disabled', 'uninstalled'].forEach(f => {
     const btn = document.getElementById(`filter-${f}`);
+    if (!btn) return;
     const isSelected = (f === filterKey);
     if (isSelected) {
       btn.className = 'filter-chip px-3 py-1 rounded text-xs font-medium transition-colors text-brand-400 bg-dark-800 border border-brand-500/30';
@@ -520,6 +521,7 @@ function filterPackages() {
     if (state.activeFilter === 'suggested') return p.is_suggested;
     if (state.activeFilter === 'system') return p.is_system;
     if (state.activeFilter === 'disabled') return p.is_disabled;
+    if (state.activeFilter === 'uninstalled') return p.is_uninstalled;
     return true;
   });
 
@@ -542,8 +544,17 @@ function renderPackagesList() {
     const isChecked = state.selectedPackages.has(p.package);
 
     let badge = '';
-    if (p.is_disabled) {
+    let statusLabel = 'Enabled';
+    let statusColor = 'text-emerald-400';
+
+    if (p.is_uninstalled) {
+      badge = '<span class="px-2 py-0.5 rounded text-[10px] font-medium bg-rose-500/10 text-rose-400 border border-rose-500/20">Uninstalled</span>';
+      statusLabel = 'Uninstalled (User 0)';
+      statusColor = 'text-rose-400';
+    } else if (p.is_disabled) {
       badge = '<span class="px-2 py-0.5 rounded text-[10px] font-medium bg-zinc-800 text-zinc-400 border border-zinc-700">Disabled</span>';
+      statusLabel = 'Disabled';
+      statusColor = 'text-zinc-500';
     } else if (p.is_suggested) {
       badge = '<span class="px-2 py-0.5 rounded text-[10px] font-medium bg-brand-500/10 text-brand-400 border border-brand-500/20">Suggested</span>';
     } else {
@@ -555,14 +566,14 @@ function renderPackagesList() {
         <input type="checkbox" ${isChecked ? 'checked' : ''} onchange="toggleSelectPackage('${p.package}', this.checked)" class="rounded bg-dark-950 border-dark-border text-brand-500 w-3.5 h-3.5 cursor-pointer accent-orange-500">
         <div>
           <div class="flex items-center gap-2">
-            <span class="text-xs font-mono ${p.is_disabled ? 'line-through text-zinc-500' : 'text-zinc-200'}">${p.package}</span>
+            <span class="text-xs font-mono ${p.is_uninstalled || p.is_disabled ? 'line-through text-zinc-500' : 'text-zinc-200'}">${p.package}</span>
             ${badge}
           </div>
           <div class="text-[11px] text-zinc-500 font-sans">${p.category}</div>
         </div>
       </div>
       <div>
-        <span class="text-[11px] text-zinc-500 font-mono">${p.is_disabled ? 'Disabled' : 'Enabled'}</span>
+        <span class="text-[11px] font-mono ${statusColor}">${statusLabel}</span>
       </div>
     `;
     container.appendChild(row);
@@ -629,10 +640,16 @@ function promptBatchAction(action) {
     confirmBtn.textContent = 'Enable';
   } else if (action === 'uninstall') {
     title.textContent = 'Uninstall Packages (User 0)';
-    subtitle.textContent = 'Execute pm uninstall -k --user 0';
+    subtitle.textContent = 'Execute pm uninstall --user 0';
     warningText.textContent = 'Caution: Do not uninstall core system frameworks to avoid system crash or bootloop.';
     confirmBtn.className = 'h-8 px-4 rounded-md text-xs font-medium bg-rose-600 hover:bg-rose-500 text-white';
     confirmBtn.textContent = 'Uninstall';
+  } else if (action === 'restore') {
+    title.textContent = 'Restore / Reinstall Packages';
+    subtitle.textContent = 'Execute cmd package install-existing';
+    warningText.textContent = 'Restores uninstalled system packages for primary user (User 0) back to active state.';
+    confirmBtn.className = 'h-8 px-4 rounded-md text-xs font-medium bg-emerald-600 hover:bg-emerald-500 text-white';
+    confirmBtn.textContent = 'Restore';
   }
 
   modal.classList.remove('hidden');
@@ -662,8 +679,18 @@ async function executeBatchActionConfirmed() {
       serial: state.activeDevice
     });
 
-    log(`Batch complete: ${res.success_count} succeeded, ${res.error_count} failed.`, res.error_count > 0 ? 'warn' : 'success');
-    showToast(`Processed ${res.success_count} packages`, 'success');
+    if (res.error_count > 0) {
+      log(`Batch complete: ${res.success_count} succeeded, ${res.error_count} rejected by OS policy.`, 'warn');
+      if (res.errors && res.errors.length > 0) {
+        res.errors.forEach(e => {
+          log(`[!] Rejected (${e.package}): ${e.reason}`, 'error');
+        });
+      }
+      showToast(`${res.success_count} processed, ${res.error_count} rejected`, 'warn');
+    } else {
+      log(`Batch complete: ${res.success_count} packages processed successfully (${action}).`, 'success');
+      showToast(`Processed ${res.success_count} packages`, 'success');
+    }
 
     await loadDevicePackages();
   } catch (err) {

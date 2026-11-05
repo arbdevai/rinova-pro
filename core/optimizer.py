@@ -33,25 +33,47 @@ class StorageOptimizer:
             elif vid == "crash_logs":
                 res = self._clean_crash_logs(serial)
                 results.append({"id": vid, "name": "System Crash Logs & Tombstones Purge", "status": res})
+            elif vid == "app_caches":
+                res = self._trim_app_caches(serial)
+                results.append({"id": vid, "name": "Global Application Cache Trim", "status": res})
 
         # Check reclaimed space
         _, df_after, _ = self.adb.shell("df -k /data", target_device=serial)
         free_after_kb = self._extract_free_kb(df_after)
 
-        reclaimed_mb = round((free_after_kb - free_before_kb) / 1024, 2)
+        delta_kb = free_after_kb - free_before_kb
+        reclaimed_mb = round(delta_kb / 1024, 2)
         reclaimed_gb = round(reclaimed_mb / 1024, 2)
+
+        if delta_kb > 0:
+            msg = f"Remediasi tuntas. Total partisi /data dipulihkan: {reclaimed_gb} GB ({reclaimed_mb} MB)."
+        else:
+            msg = "Remediasi tuntas dieksekusi. Tidak ada pertambahan kapasitas fisik (file target sudah bersih atau dilindungi Scoped Storage)."
 
         return {
             "success": True,
             "reclaimed_mb": max(0.0, reclaimed_mb),
             "reclaimed_gb": max(0.0, reclaimed_gb),
             "executed_vectors": results,
-            "message": f"Remediasi tuntas. Total ruang partisi dipulihkan: {max(0.0, reclaimed_gb)} GB."
+            "message": msg
         }
+
+    def _detect_mediaprovider_package(self, serial: Optional[str] = None) -> str:
+        candidates = [
+            "com.android.providers.media.module",
+            "com.google.android.providers.media.module",
+            "com.android.providers.media"
+        ]
+        _, out, _ = self.adb.shell("pm list packages media", target_device=serial, timeout=5)
+        for cand in candidates:
+            if cand in out:
+                return cand
+        return "com.android.providers.media.module"
 
     def _fix_mediastore(self, serial: Optional[str]) -> bool:
         """Vector 1: Resets bloated MediaProvider database & broadcasts media scanner."""
-        self.adb.shell("pm clear com.google.android.providers.media.module", target_device=serial, timeout=15)
+        pkg = self._detect_mediaprovider_package(serial)
+        code, out, _ = self.adb.shell(f"pm clear {pkg}", target_device=serial, timeout=15)
         scan_paths = [
             "/storage/emulated/0/DCIM",
             "/storage/emulated/0/Pictures",
@@ -65,36 +87,46 @@ class StorageOptimizer:
                 target_device=serial,
                 timeout=5
             )
-        return True
+        return code == 0 or "success" in out.lower()
 
     def _clean_whatsapp_backups(self, serial: Optional[str]) -> bool:
         """Vector 3: Keeps the newest backup file and removes older daily redundant backups."""
-        # Query WhatsApp daily backup files sorted by modification time
         script = (
-            "for dir in /storage/emulated/0/Android/media/com.whatsapp/WhatsApp/Databases /storage/emulated/0/WhatsApp/Databases; do "
+            "for dir in "
+            "/storage/emulated/0/Android/media/com.whatsapp/WhatsApp/Databases "
+            "/storage/emulated/0/WhatsApp/Databases "
+            "/storage/emulated/0/Android/media/com.whatsapp.w4b/WhatsApp\\ Business/Databases; do "
             "  if [ -d \"$dir\" ]; then "
             "    ls -t \"$dir\"/msgstore-*.db.crypt* 2>/dev/null | tail -n +2 | while read -r f; do rm -f \"$f\"; done; "
             "  fi; "
             "done"
         )
-        self.adb.shell(script, target_device=serial, timeout=10)
-        return True
+        code, _, _ = self.adb.shell(script, target_device=serial, timeout=10)
+        return code == 0
 
     def _clean_recycle_bin(self, serial: Optional[str]) -> bool:
-        """Vector 4: Purges hidden .Trash folders and dead thumbnails."""
+        """Vector 4: Purges hidden .Trash folders, Samsung gallery trash, and dead thumbnails."""
         script = (
             "rm -rf /storage/emulated/0/Android/.Trash/* 2>/dev/null; "
+            "rm -rf /storage/emulated/0/.Trash/* 2>/dev/null; "
+            "rm -rf /storage/emulated/0/.Trash-1000/* 2>/dev/null; "
             "rm -rf /storage/emulated/0/DCIM/.thumbnails/* 2>/dev/null; "
-            "rm -rf /storage/emulated/0/Pictures/.thumbnails/* 2>/dev/null"
+            "rm -rf /storage/emulated/0/Pictures/.thumbnails/* 2>/dev/null; "
+            "rm -rf /storage/emulated/0/Android/data/com.sec.android.gallery3d/cache/* 2>/dev/null"
         )
-        self.adb.shell(script, target_device=serial, timeout=10)
-        return True
+        code, _, _ = self.adb.shell(script, target_device=serial, timeout=10)
+        return code == 0
 
     def _clean_telegram_cache(self, serial: Optional[str]) -> bool:
         """Vector 5: Purges temporary streaming cache from Telegram."""
         script = "rm -rf /storage/emulated/0/Android/data/org.telegram.messenger/cache/* 2>/dev/null"
-        self.adb.shell(script, target_device=serial, timeout=10)
-        return True
+        code, _, _ = self.adb.shell(script, target_device=serial, timeout=10)
+        return code == 0
+
+    def _trim_app_caches(self, serial: Optional[str]) -> bool:
+        """Vector 7: Trims global temporary application caches safely via package manager."""
+        code, out, _ = self.adb.shell("pm trim-caches 999G", target_device=serial, timeout=15)
+        return code == 0 or "trimmed" in out.lower() or "success" in out.lower()
 
     def _clean_crash_logs(self, serial: Optional[str]) -> bool:
         """Vector 6: Clears system DropBox crash logs, tombstones, and temp crash dumps."""

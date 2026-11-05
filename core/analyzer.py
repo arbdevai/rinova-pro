@@ -69,6 +69,10 @@ class StorageAnalyzer:
         v6 = self._audit_crash_logs(serial)
         findings.append(v6)
 
+        # Vector 7: Application Temporary Cache & Dexopt Buffers
+        v7 = self._audit_app_caches(serial)
+        findings.append(v7)
+
         # Calculate total reclaimable space
         total_reclaimable_mb = sum(f["size_mb"] for f in findings if f["reclaimable"])
         total_reclaimable_gb = round(total_reclaimable_mb / 1024, 2)
@@ -89,10 +93,24 @@ class StorageAnalyzer:
             "top_apps": top_apps[:10]
         }
 
+    def _detect_mediaprovider_package(self, serial: Optional[str] = None) -> str:
+        """Dynamically identifies the active MediaProvider package on device (Samsung/Pixel/AOSP)."""
+        candidates = [
+            "com.android.providers.media.module",
+            "com.google.android.providers.media.module",
+            "com.android.providers.media"
+        ]
+        _, out, _ = self.adb.shell("pm list packages media", target_device=serial, timeout=5)
+        for cand in candidates:
+            if cand in out:
+                return cand
+        return "com.android.providers.media.module"
+
     def _audit_mediastore(self, serial: Optional[str]) -> Dict[str, Any]:
-        """Vector 1: Checks external.db size in MediaProvider."""
+        """Vector 1: Checks external.db size in MediaProvider dynamically."""
+        pkg = self._detect_mediaprovider_package(serial)
         code, out, _ = self.adb.shell(
-            "dumpsys meminfo com.google.android.providers.media.module",
+            f"dumpsys meminfo {pkg}",
             target_device=serial,
             timeout=8
         )
@@ -111,13 +129,13 @@ class StorageAnalyzer:
 
         return {
             "id": "mediastore_bloat",
-            "title": "MediaStore SQLite Database Bloat",
-            "target": "/data/user/0/com.google.android.providers.media.module/databases/external.db",
+            "title": f"MediaStore Database SQLite ({pkg})",
+            "target": f"/data/user/0/{pkg}/databases/external.db",
             "size_mb": mb,
             "size_gb": gb,
             "reclaimable": is_bloated,
             "severity": "CRITICAL" if is_bloated else "CLEAN",
-            "note": "Indeks SQLite membengkak akibat loop transaksi. Reset aman tanpa menghapus file media fisik." if is_bloated else "Ukuran database SQLite berada pada batas normal."
+            "note": "Indeks SQLite membengkak akibat loop transaksi. Reset aman tanpa menghapus file media fisik." if is_bloated else f"Ukuran database MediaStore ({mb} MB) berada pada batas normal."
         }
 
     def _audit_multiuser(self, serial: Optional[str]) -> Dict[str, Any]:
@@ -194,11 +212,14 @@ class StorageAnalyzer:
         }
 
     def _audit_recycle_bin(self, serial: Optional[str]) -> Dict[str, Any]:
-        """Vector 4: Checks Gallery / Storage Recycle Bin (.Trash & .thumbnails)."""
+        """Vector 4: Checks Gallery / Storage Recycle Bin (.Trash, Samsung trash & .thumbnails)."""
         check_cmd = (
             "du -sk /storage/emulated/0/Android/.Trash 2>/dev/null; "
+            "du -sk /storage/emulated/0/.Trash 2>/dev/null; "
+            "du -sk /storage/emulated/0/.Trash-1000 2>/dev/null; "
             "du -sk /storage/emulated/0/DCIM/.thumbnails 2>/dev/null; "
-            "du -sk /storage/emulated/0/Pictures/.thumbnails 2>/dev/null"
+            "du -sk /storage/emulated/0/Pictures/.thumbnails 2>/dev/null; "
+            "du -sk /storage/emulated/0/Android/data/com.sec.android.gallery3d/cache 2>/dev/null"
         )
         code, out, _ = self.adb.shell(check_cmd, target_device=serial)
         total_kb = 0
@@ -214,17 +235,17 @@ class StorageAnalyzer:
 
         mb = round(total_kb / 1024, 2)
         gb = round(mb / 1024, 2)
-        has_trash = mb > 100
+        has_trash = mb > 50
 
         return {
             "id": "recycle_bin",
             "title": "Recycle Bin & Thumbnail Cache (.Trash / .thumbnails)",
-            "target": "/sdcard/Android/.Trash & DCIM/.thumbnails",
+            "target": "/sdcard/.Trash & DCIM/.thumbnails",
             "size_mb": mb,
             "size_gb": gb,
             "reclaimable": has_trash,
             "severity": "MEDIUM" if has_trash else "CLEAN",
-            "note": "File sampah yang mengendap di Recycle Bin dan cache thumbnail usang." if has_trash else "Recycle Bin dan thumbnail cache dalam kondisi bersih."
+            "note": f"Ditemukan {mb} MB file sampah recycle bin dan cache thumbnail." if has_trash else "Recycle Bin dan thumbnail cache dalam kondisi bersih."
         }
 
     def _audit_telegram_cache(self, serial: Optional[str]) -> Dict[str, Any]:
@@ -291,6 +312,34 @@ class StorageAnalyzer:
             "reclaimable": has_logs,
             "severity": "MEDIUM" if has_logs else "CLEAN",
             "note": f"Ditemukan {entry_count} riwayat crash/ANR di DropBox dan trace cache sistem." if has_logs else "Log crash sistem dan DropBox dalam batas normal."
+        }
+
+    def _audit_app_caches(self, serial: Optional[str]) -> Dict[str, Any]:
+        """Vector 7: Checks accumulated temporary application caches via diskstats."""
+        code, out, _ = self.adb.shell("dumpsys diskstats", target_device=serial, timeout=8)
+        cache_bytes = 0
+        if code == 0 and out:
+            cache_match = re.search(r"App Cache Sizes:\s*(\[.*?\])", out)
+            if cache_match:
+                try:
+                    sizes = json.loads(cache_match.group(1))
+                    cache_bytes = sum(sizes)
+                except Exception:
+                    pass
+
+        mb = round(cache_bytes / (1024 * 1024), 2)
+        gb = round(mb / 1024, 2)
+        has_cache = mb > 100.0
+
+        return {
+            "id": "app_caches",
+            "title": "Application Temporary Caches & Dexopt Residuals",
+            "target": "Global Package Cache (pm trim-caches)",
+            "size_mb": mb,
+            "size_gb": gb,
+            "reclaimable": has_cache,
+            "severity": "HIGH" if mb > 1000 else ("MEDIUM" if has_cache else "CLEAN"),
+            "note": f"Ditemukan {mb} MB cache aplikasi terakumulasi yang dapat dibersihkan secara aman tanpa menghapus data login." if has_cache else "Cache aplikasi dalam batas aman."
         }
 
     def _parse_diskstats(self, content: str) -> List[Dict[str, Any]]:
