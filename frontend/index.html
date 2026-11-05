@@ -622,7 +622,7 @@
         <div>
           <h3 class="text-sm font-semibold text-white flex items-center gap-2">
             <i class="ph-bold ph-arrow-circle-up text-brand-400 text-base"></i>
-            <span>Pembaruan Tersedia</span>
+            <span>Pembaruan Sistem Tersedia</span>
           </h3>
           <p id="update-modal-ver" class="text-xs text-brand-400 font-mono mt-0.5">v1.0.1</p>
         </div>
@@ -633,22 +633,40 @@
 
       <div class="p-3 rounded-lg bg-dark-950 border border-dark-border space-y-1.5">
         <div class="text-[11px] font-semibold text-zinc-300 uppercase tracking-wider">Catatan Rilis:</div>
-        <div id="update-modal-notes" class="text-xs text-zinc-400 max-h-36 overflow-y-auto whitespace-pre-wrap font-sans leading-relaxed"></div>
+        <div id="update-modal-notes" class="text-xs text-zinc-400 max-h-28 overflow-y-auto whitespace-pre-wrap font-sans leading-relaxed"></div>
+      </div>
+
+      <!-- Resumable Progress Card -->
+      <div id="update-progress-card" class="p-3 rounded-lg bg-dark-950 border border-dark-border space-y-2 hidden">
+        <div class="flex items-center justify-between text-xs font-mono">
+          <span id="update-status-label" class="text-zinc-300 font-sans flex items-center gap-1.5">
+            <i class="ph-bold ph-spinner animate-spin text-brand-400"></i>
+            <span>Mengunduh update...</span>
+          </span>
+          <span id="update-pct-label" class="font-bold text-brand-400">0%</span>
+        </div>
+        <div class="w-full h-2 rounded-full bg-dark-800 overflow-hidden border border-dark-border">
+          <div id="update-progress-bar" class="h-full bg-gradient-to-r from-brand-600 to-brand-400 rounded-full transition-all duration-200" style="width: 0%"></div>
+        </div>
+        <div class="flex items-center justify-between text-[10px] text-zinc-500 font-mono">
+          <span id="update-size-stats">0.0 MB / -- MB</span>
+          <span id="update-speed-stats">0.0 KB/s</span>
+        </div>
       </div>
 
       <div class="flex items-center justify-between text-xs text-zinc-500 pt-1">
-        <span>File: <span id="update-modal-file" class="font-mono text-zinc-300">RinovaPro-Windows-Portable.zip</span></span>
+        <span>Arsip: <span id="update-modal-file" class="font-mono text-zinc-300">RinovaPro-Windows-Portable.zip</span></span>
         <span id="update-modal-current" class="font-mono">Current: v1.0.0</span>
       </div>
 
       <div class="flex items-center justify-end gap-2 pt-2">
-        <button onclick="closeUpdateModal()" class="h-8 px-3 rounded-md text-xs font-medium bg-dark-850 hover:bg-dark-800 text-zinc-300 border border-dark-border transition-colors">
-          Nanti Saja
+        <button id="update-cancel-btn" onclick="closeUpdateModal()" class="h-8 px-3 rounded-md text-xs font-medium bg-dark-850 hover:bg-dark-800 text-zinc-300 border border-dark-border transition-colors">
+          Batal
         </button>
-        <a id="update-modal-download-btn" href="#" target="_blank" class="h-8 px-4 rounded-md text-xs font-medium bg-brand-500 hover:bg-brand-600 text-white transition-colors flex items-center gap-1.5 inline-flex">
-          <i class="ph-bold ph-download-simple text-xs"></i>
-          <span>Unduh Pembaruan</span>
-        </a>
+        <button id="update-action-btn" onclick="triggerInAppUpdateAction()" class="h-8 px-4 rounded-md text-xs font-medium bg-brand-500 hover:bg-brand-600 text-white transition-colors flex items-center gap-1.5">
+          <i class="ph-bold ph-download-simple text-xs" id="update-action-icon"></i>
+          <span id="update-action-text">Unduh & Pasang Otomatis</span>
+        </button>
       </div>
     </div>
   </div>

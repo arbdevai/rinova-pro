@@ -744,6 +744,8 @@ async function executeDisconnect() {
 }
 
 // ================= IN-APP UPDATE ENGINE =================
+let updatePollTimer = null;
+
 async function checkAppUpdate() {
   try {
     const res = await callApi('/api/check-update');
@@ -770,7 +772,6 @@ function openUpdateModal() {
   document.getElementById('update-modal-notes').textContent = info.release_notes || 'Pembaruan sistem dan perbaikan performa.';
   document.getElementById('update-modal-file').textContent = info.asset_name || 'RinovaPro-Windows-Portable.zip';
   document.getElementById('update-modal-current').textContent = `Current: v${info.current_version}`;
-  document.getElementById('update-modal-download-btn').href = info.download_url;
 
   modal.classList.remove('hidden');
   setTimeout(() => modal.classList.remove('opacity-0'), 10);
@@ -780,6 +781,108 @@ function closeUpdateModal() {
   const modal = document.getElementById('update-modal');
   modal.classList.add('opacity-0');
   setTimeout(() => modal.classList.add('hidden'), 150);
+}
+
+async function triggerInAppUpdateAction() {
+  if (!state.updateInfo) return;
+
+  const btn = document.getElementById('update-action-btn');
+  const btnText = document.getElementById('update-action-text');
+  const btnIcon = document.getElementById('update-action-icon');
+
+  // If already verified and ready, apply update
+  if (btnText.textContent.includes('Restart') || btnText.textContent.includes('Pasang')) {
+    btnText.textContent = 'Memulai Restart...';
+    btn.disabled = true;
+    log('Memasang pembaruan dan meluncurkan ulang binary Rinova Pro...', 'info');
+    try {
+      const res = await callApi('/api/apply-update-and-restart');
+      showToast(res.message, 'success');
+    } catch (e) {
+      log('Gagal menerapkan update: ' + e.message, 'error');
+    }
+    return;
+  }
+
+  // Start background resumable chunk download
+  const progressCard = document.getElementById('update-progress-card');
+  progressCard.classList.remove('hidden');
+
+  btn.disabled = true;
+  btnText.textContent = 'Memulai Unduhan...';
+  btnIcon.className = 'ph-bold ph-spinner animate-spin text-xs';
+
+  log(`Memulai unduhan atomic .part untuk v${state.updateInfo.latest_version}...`, 'info');
+
+  try {
+    await callApi('/api/start-update-download', {
+      download_url: state.updateInfo.download_url,
+      version: state.updateInfo.latest_version
+    });
+
+    if (updatePollTimer) clearInterval(updatePollTimer);
+    updatePollTimer = setInterval(pollUpdateProgress, 350);
+  } catch (err) {
+    btn.disabled = false;
+    btnText.textContent = 'Coba Lagi';
+    btnIcon.className = 'ph-bold ph-arrow-clockwise text-xs';
+    log('Gagal memulai unduhan: ' + err.message, 'error');
+  }
+}
+
+async function pollUpdateProgress() {
+  try {
+    const p = await callApi('/api/get-update-progress');
+    const bar = document.getElementById('update-progress-bar');
+    const pct = document.getElementById('update-pct-label');
+    const statusLabel = document.getElementById('update-status-label');
+    const sizeStats = document.getElementById('update-size-stats');
+    const speedStats = document.getElementById('update-speed-stats');
+    const btn = document.getElementById('update-action-btn');
+    const btnText = document.getElementById('update-action-text');
+    const btnIcon = document.getElementById('update-action-icon');
+
+    if (p.status === 'downloading') {
+      statusLabel.innerHTML = '<i class="ph-bold ph-spinner animate-spin text-brand-400"></i><span>Mengunduh buffer chunk (Resumable)...</span>';
+      bar.style.width = `${p.progress}%`;
+      pct.textContent = `${p.progress}%`;
+      sizeStats.textContent = `${p.downloaded_mb} MB / ${p.total_mb} MB`;
+      speedStats.textContent = `${p.speed_kbps} KB/s`;
+      btnText.textContent = `Mengunduh (${p.progress}%)...`;
+    } else if (p.status === 'verifying') {
+      statusLabel.innerHTML = '<i class="ph-bold ph-shield-check text-sky-400"></i><span>Memverifikasi CRC32 ZIP (Anti-Korup)...</span>';
+      bar.style.width = '99%';
+      pct.textContent = '99%';
+      btnText.textContent = 'Memverifikasi...';
+    } else if (p.status === 'ready') {
+      clearInterval(updatePollTimer);
+      updatePollTimer = null;
+      statusLabel.innerHTML = '<i class="ph-bold ph-check-circle text-emerald-400"></i><span class="text-emerald-400 font-medium">Integritas 100% Lolos Uji Validasi!</span>';
+      bar.style.width = '100%';
+      bar.className = 'h-full bg-emerald-500 rounded-full transition-all duration-200';
+      pct.textContent = '100%';
+      sizeStats.textContent = `${p.total_mb} MB Selesai`;
+      speedStats.textContent = 'Terverifikasi';
+
+      btn.disabled = false;
+      btn.className = 'h-8 px-4 rounded-md text-xs font-medium bg-emerald-600 hover:bg-emerald-500 text-white transition-colors flex items-center gap-1.5 shadow-lg shadow-emerald-600/20';
+      btnText.textContent = 'Pasang & Restart Aplikasi';
+      btnIcon.className = 'ph-bold ph-arrows-clockwise text-xs';
+      log('Arsip update berhasil diverifikasi. Siap dipasang.', 'success');
+      showToast('Pembaruan siap dipasang', 'success');
+    } else if (p.status === 'error') {
+      clearInterval(updatePollTimer);
+      updatePollTimer = null;
+      statusLabel.innerHTML = `<i class="ph-bold ph-x-circle text-rose-400"></i><span class="text-rose-400">Gagal: ${p.error}</span>`;
+      btn.disabled = false;
+      btnText.textContent = 'Unduh Ulang';
+      btnIcon.className = 'ph-bold ph-arrow-clockwise text-xs';
+      log('Proses update error: ' + p.error, 'error');
+      showToast('Gagal mengunduh update', 'error');
+    }
+  } catch (err) {
+    // Silent polling error
+  }
 }
 
 // Initializer

@@ -55,6 +55,18 @@ class DesktopAPIBridge:
     def check_update(self, payload=None):
         return self.api.check_update()
 
+    def start_update_download(self, payload):
+        return self.api.start_update_download(payload.get("download_url", ""), payload.get("version", ""))
+
+    def get_update_progress(self, payload=None):
+        return self.api.get_update_progress()
+
+    def apply_update_and_restart(self, payload=None):
+        return self.api.apply_update_and_restart()
+
+    def cancel_update_download(self, payload=None):
+        return self.api.cancel_update_download()
+
     def get_app_version(self, payload=None):
         return self.api.get_app_version()
 
@@ -96,6 +108,10 @@ def main():
         bridge.disconnect_device,
         bridge.heartbeat,
         bridge.check_update,
+        bridge.start_update_download,
+        bridge.get_update_progress,
+        bridge.apply_update_and_restart,
+        bridge.cancel_update_download,
         bridge.get_app_version
     )
 

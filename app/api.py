@@ -8,7 +8,7 @@ from core.device import DeviceInspector
 from core.analyzer import StorageAnalyzer
 from core.optimizer import StorageOptimizer
 from core.debloater import Debloater
-from core.updater import UpdateChecker
+from core.updater import UpdateManager
 from core.version import APP_VERSION
 
 class RinovaAPI:
@@ -18,7 +18,7 @@ class RinovaAPI:
         self.storage_analyzer = StorageAnalyzer(self.adb)
         self.storage_optimizer = StorageOptimizer(self.adb)
         self.debloater = Debloater(self.adb)
-        self.updater = UpdateChecker()
+        self.updater = UpdateManager()
 
     def get_devices(self) -> List[Dict[str, Any]]:
         return self.adb.list_devices()
@@ -59,6 +59,18 @@ class RinovaAPI:
 
     def check_update(self) -> Dict[str, Any]:
         return self.updater.check_update()
+
+    def start_update_download(self, download_url: str, version: str) -> Dict[str, Any]:
+        return self.updater.start_download(download_url, version)
+
+    def get_update_progress(self) -> Dict[str, Any]:
+        return self.updater.get_progress()
+
+    def apply_update_and_restart(self) -> Dict[str, Any]:
+        return self.updater.apply_update_and_restart()
+
+    def cancel_update_download(self) -> Dict[str, Any]:
+        return self.updater.cancel_download()
 
     def get_app_version(self) -> Dict[str, str]:
         return {"version": APP_VERSION}

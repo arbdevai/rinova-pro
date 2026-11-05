@@ -64,6 +64,14 @@ class RinovaRequestHandler(SimpleHTTPRequestHandler):
                 response_data = api.heartbeat()
             elif path == "/api/check-update":
                 response_data = api.check_update()
+            elif path == "/api/start-update-download":
+                response_data = api.start_update_download(payload.get("download_url", ""), payload.get("version", ""))
+            elif path == "/api/get-update-progress":
+                response_data = api.get_update_progress()
+            elif path == "/api/apply-update-and-restart":
+                response_data = api.apply_update_and_restart()
+            elif path == "/api/cancel-update-download":
+                response_data = api.cancel_update_download()
             elif path == "/api/get-app-version":
                 response_data = api.get_app_version()
             else:
