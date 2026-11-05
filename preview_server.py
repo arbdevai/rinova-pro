@@ -60,6 +60,12 @@ class RinovaRequestHandler(SimpleHTTPRequestHandler):
                 response_data = api.connect_wireless(payload.get("address_port", ""))
             elif path == "/api/disconnect-device":
                 response_data = api.disconnect_device(payload.get("address_port"))
+            elif path == "/api/heartbeat":
+                response_data = api.heartbeat()
+            elif path == "/api/check-update":
+                response_data = api.check_update()
+            elif path == "/api/get-app-version":
+                response_data = api.get_app_version()
             else:
                 self.send_response(404)
                 self.end_headers()

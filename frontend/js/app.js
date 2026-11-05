@@ -5,6 +5,8 @@
 const state = {
   activeTab: 'storage',
   activeDevice: null,
+  telemetry: null,
+  updateInfo: null,
   isScanning: false,
   isRemediating: false,
   findings: [],
@@ -109,41 +111,120 @@ function switchTab(tabName) {
   }
 }
 
-// Refresh Connected Device
+// Telemetry UI Controller
+function updateTelemetryUI(info) {
+  state.telemetry = info;
+  const connEl = document.getElementById('telemetry-connected');
+  const disconnEl = document.getElementById('telemetry-disconnected');
+  const transportEl = document.getElementById('telemetry-transport');
+
+  if (!info || !info.connected) {
+    clearTelemetryUI();
+    return;
+  }
+
+  connEl.classList.remove('hidden');
+  connEl.classList.add('flex');
+  disconnEl.classList.add('hidden');
+  transportEl.classList.remove('hidden');
+
+  document.getElementById('telemetry-device').textContent = `${info.manufacturer} ${info.model}`;
+  document.getElementById('telemetry-os').textContent = `Android ${info.android_version} (SDK ${info.sdk_version})`;
+  document.getElementById('telemetry-patch').textContent = info.security_patch || 'N/A';
+  document.getElementById('telemetry-battery').textContent = info.battery_level || '--%';
+  document.getElementById('telemetry-temp').textContent = info.battery_temp || '--°C';
+
+  const badgeEl = document.getElementById('telemetry-mode-badge');
+  badgeEl.textContent = info.is_wireless ? 'WIRELESS ADB' : 'USB DIRECT';
+  badgeEl.className = info.is_wireless 
+    ? 'px-2 py-0.5 rounded bg-brand-500/10 text-brand-400 border border-brand-500/30 uppercase'
+    : 'px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 uppercase';
+
+  document.getElementById('telemetry-serial').textContent = `ID: ${info.serial}`;
+}
+
+function clearTelemetryUI() {
+  state.telemetry = null;
+  const connEl = document.getElementById('telemetry-connected');
+  const disconnEl = document.getElementById('telemetry-disconnected');
+  const transportEl = document.getElementById('telemetry-transport');
+
+  if (connEl) {
+    connEl.classList.add('hidden');
+    connEl.classList.remove('flex');
+  }
+  if (disconnEl) disconnEl.classList.remove('hidden');
+  if (transportEl) transportEl.classList.add('hidden');
+}
+
+// Refresh Connected Device with Authorization Validation
 async function refreshDeviceList() {
   const icon = document.getElementById('refresh-icon');
   if (icon) icon.classList.add('animate-spin');
-  log('Scanning ADB interfaces...', 'info');
 
   try {
-    const devices = await callApi('/api/get-devices');
+    const heartbeat = await callApi('/api/heartbeat');
     if (icon) icon.classList.remove('animate-spin');
 
     const pillDot = document.getElementById('device-dot');
     const pillText = document.getElementById('device-text');
 
-    if (devices && devices.length > 0) {
-      const dev = devices[0];
+    if (heartbeat.unauthorized_count > 0 && !heartbeat.connected) {
+      state.activeDevice = null;
+      pillDot.className = 'w-2 h-2 rounded-full bg-amber-500 animate-pulse';
+      pillText.textContent = 'UNAUTHORIZED';
+      clearTelemetryUI();
+      log('PERINGATAN: Perangkat terhubung tetapi status UNAUTHORIZED. Harap centang [Selalu Izinkan dari Komputer Ini] pada layar HP.', 'warn');
+      showToast('Device unauthorized: Izinkan di layar HP', 'warn');
+      return;
+    }
+
+    if (heartbeat.connected && heartbeat.active_device) {
+      const dev = heartbeat.active_device;
       state.activeDevice = dev.serial;
-      await callApi('/api/select-device', { serial: dev.serial });
 
       pillDot.className = 'w-2 h-2 rounded-full bg-emerald-500';
       pillText.textContent = `${dev.model || dev.serial}`;
 
       const info = await callApi('/api/get-device-info', { serial: dev.serial });
       if (info.connected) {
-        log(`Attached: ${info.manufacturer} ${info.model} (Android ${info.android_version})`, 'success');
+        updateTelemetryUI(info);
+        log(`Attached: ${info.manufacturer} ${info.model} (Android ${info.android_version}, Patch: ${info.security_patch})`, 'success');
       }
     } else {
       state.activeDevice = null;
       pillDot.className = 'w-2 h-2 rounded-full bg-zinc-600';
       pillText.textContent = 'DISCONNECTED';
-      log('No devices attached. Check USB connection or Wireless ADB status.', 'warn');
+      clearTelemetryUI();
     }
   } catch (err) {
     if (icon) icon.classList.remove('animate-spin');
     log('Device scan failure: ' + err.message, 'error');
   }
+}
+
+// Background Heartbeat Poller (4s interval)
+function initHeartbeat() {
+  setInterval(async () => {
+    try {
+      const hb = await callApi('/api/heartbeat');
+      const wasConnected = !!state.activeDevice;
+      const isNowConnected = hb.connected && !!hb.active_device;
+
+      if (!wasConnected && isNowConnected) {
+        log('Perangkat terdeteksi terhubung via ADB. Memperbarui telemetri...', 'info');
+        await refreshDeviceList();
+      } else if (wasConnected && !isNowConnected) {
+        log('Perangkat terputus dari koneksi ADB.', 'warn');
+        state.activeDevice = null;
+        document.getElementById('device-dot').className = 'w-2 h-2 rounded-full bg-zinc-600';
+        document.getElementById('device-text').textContent = 'DISCONNECTED';
+        clearTelemetryUI();
+      }
+    } catch (e) {
+      // Silent error during heartbeat
+    }
+  }, 4000);
 }
 
 // ================= MULTI-VECTOR STORAGE ANALYSIS =================
@@ -299,12 +380,59 @@ function updateSelectedReclaimText() {
   document.getElementById('selected-reclaim-text').textContent = `Selected: ${selectedGb} GB (${state.selectedFindings.size} vectors)`;
 }
 
-// Multi-Vector Remediation Execution
-async function executeSelectedRemediation() {
+// Multi-Vector Remediation Flow with Explicit Confirmation Modal
+function executeSelectedRemediation() {
   if (state.selectedFindings.size === 0) {
-    showToast('Select at least one reclaimable vector', 'warn');
+    showToast('Pilih minimal satu vector remediasi', 'warn');
     return;
   }
+  openRemediationModal();
+}
+
+function openRemediationModal() {
+  const modal = document.getElementById('remediation-modal');
+  const countEl = document.getElementById('remed-modal-count');
+  const spaceEl = document.getElementById('remed-modal-space');
+  const listEl = document.getElementById('remed-modal-list');
+
+  let totalMb = 0;
+  listEl.innerHTML = '';
+
+  state.findings.forEach(f => {
+    if (state.selectedFindings.has(f.id)) {
+      totalMb += f.size_mb;
+      const row = document.createElement('div');
+      row.className = 'flex items-center justify-between p-2 rounded bg-dark-900 border border-dark-border text-xs';
+      row.innerHTML = `
+        <div class="flex items-center gap-2">
+          <i class="ph-bold ph-check-circle text-brand-400"></i>
+          <div>
+            <div class="font-medium text-white">${f.title}</div>
+            <div class="text-[10px] text-zinc-500 font-mono">${f.target}</div>
+          </div>
+        </div>
+        <div class="font-mono font-semibold text-brand-400">${f.size_gb} GB</div>
+      `;
+      listEl.appendChild(row);
+    }
+  });
+
+  const totalGb = (totalMb / 1024).toFixed(2);
+  countEl.textContent = `${state.selectedFindings.size} Vector`;
+  spaceEl.textContent = `${totalGb} GB`;
+
+  modal.classList.remove('hidden');
+  setTimeout(() => modal.classList.remove('opacity-0'), 10);
+}
+
+function closeRemediationModal() {
+  const modal = document.getElementById('remediation-modal');
+  modal.classList.add('opacity-0');
+  setTimeout(() => modal.classList.add('hidden'), 150);
+}
+
+async function executeRemediationConfirmed() {
+  closeRemediationModal();
   if (state.isRemediating) return;
   state.isRemediating = true;
 
@@ -313,7 +441,7 @@ async function executeSelectedRemediation() {
   btn.disabled = true;
 
   const vectorIds = Array.from(state.selectedFindings);
-  log(`Executing targeted remediation on ${vectorIds.length} vectors: ${vectorIds.join(', ')}...`, 'info');
+  log(`Menjalankan remediasi pada ${vectorIds.length} vector terpilih...`, 'info');
 
   try {
     const res = await callApi('/api/execute-remediation', {
@@ -327,11 +455,11 @@ async function executeSelectedRemediation() {
 
     if (res.success) {
       log(res.message, 'success');
-      showToast(`Remediation complete (+${res.reclaimed_gb} GB)`, 'success');
+      showToast(`Remediasi sukses: +${res.reclaimed_gb} GB`, 'success');
       setTimeout(runStorageScan, 1500);
     } else {
-      log('Remediation error occurred.', 'error');
-      showToast('Remediation incomplete', 'error');
+      log('Eksekusi remediasi mengalami kendala.', 'error');
+      showToast('Remediasi belum lengkap', 'error');
     }
   } catch (err) {
     state.isRemediating = false;
@@ -615,8 +743,49 @@ async function executeDisconnect() {
   }
 }
 
+// ================= IN-APP UPDATE ENGINE =================
+async function checkAppUpdate() {
+  try {
+    const res = await callApi('/api/check-update');
+    if (res && res.success && res.update_available) {
+      state.updateInfo = res;
+      const pillBtn = document.getElementById('btn-update-pill');
+      const pillText = document.getElementById('update-pill-text');
+      if (pillBtn && pillText) {
+        pillText.textContent = `v${res.latest_version} Ready`;
+        pillBtn.classList.remove('hidden');
+      }
+      log(`Pembaruan rilis baru terdeteksi di GitHub: v${res.latest_version} (Saat ini: v${res.current_version})`, 'brand');
+    }
+  } catch (e) {
+    // Silent fail on update check
+  }
+}
+
+function openUpdateModal() {
+  if (!state.updateInfo) return;
+  const info = state.updateInfo;
+  const modal = document.getElementById('update-modal');
+  document.getElementById('update-modal-ver').textContent = `Versi Baru: v${info.latest_version}`;
+  document.getElementById('update-modal-notes').textContent = info.release_notes || 'Pembaruan sistem dan perbaikan performa.';
+  document.getElementById('update-modal-file').textContent = info.asset_name || 'RinovaPro-Windows-Portable.zip';
+  document.getElementById('update-modal-current').textContent = `Current: v${info.current_version}`;
+  document.getElementById('update-modal-download-btn').href = info.download_url;
+
+  modal.classList.remove('hidden');
+  setTimeout(() => modal.classList.remove('opacity-0'), 10);
+}
+
+function closeUpdateModal() {
+  const modal = document.getElementById('update-modal');
+  modal.classList.add('opacity-0');
+  setTimeout(() => modal.classList.add('hidden'), 150);
+}
+
 // Initializer
 window.addEventListener('DOMContentLoaded', () => {
   log('Rinova Pro initialized.', 'info');
   refreshDeviceList();
+  initHeartbeat();
+  checkAppUpdate();
 });

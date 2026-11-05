@@ -45,9 +45,10 @@ class DeviceInspector:
                 except Exception:
                     pass
 
+        target_serial = serial or self.adb.selected_device or "Default"
         return {
             "connected": True,
-            "serial": serial or self.adb.selected_device or "Default",
+            "serial": target_serial,
             "brand": brand.capitalize(),
             "model": model,
             "manufacturer": manufacturer.capitalize(),
@@ -55,5 +56,6 @@ class DeviceInspector:
             "sdk_version": sdk_ver,
             "security_patch": security_patch,
             "battery_level": battery_level,
-            "battery_temp": battery_temp
+            "battery_temp": battery_temp,
+            "is_wireless": ":" in target_serial
         }

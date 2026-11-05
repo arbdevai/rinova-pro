@@ -9,7 +9,7 @@ import sys
 import subprocess
 import shutil
 import re
-from typing import List, Dict, Optional, Tuple
+from typing import List, Dict, Optional, Tuple, Any
 
 class ADBClient:
     def __init__(self, custom_adb_path: Optional[str] = None):
@@ -107,6 +107,44 @@ class ADBClient:
                     "is_wireless": ":" in serial
                 })
         return devices
+
+    def get_heartbeat(self) -> Dict[str, Any]:
+        """Fast heartbeat check to verify active ADB connection and authorization state."""
+        devices = self.list_devices()
+        current_serial = self.selected_device
+
+        active_device = None
+        unauthorized_devices = []
+
+        for d in devices:
+            if d["status"] == "unauthorized":
+                unauthorized_devices.append(d)
+            if current_serial and d["serial"] == current_serial:
+                active_device = d
+
+        # If current active device dropped or was unset, select the first valid authorized device
+        if (not active_device or active_device["status"] != "device"):
+            for d in devices:
+                if d["status"] == "device":
+                    active_device = d
+                    self.selected_device = d["serial"]
+                    break
+            if not active_device and not current_serial and len(devices) > 0:
+                active_device = devices[0]
+
+        is_connected = (active_device is not None and active_device.get("status") == "device")
+        if not is_connected and not active_device:
+            self.selected_device = None
+
+        return {
+            "connected": is_connected,
+            "active_device": active_device,
+            "status": active_device["status"] if active_device else "disconnected",
+            "device_count": len(devices),
+            "unauthorized_count": len(unauthorized_devices),
+            "unauthorized_devices": unauthorized_devices,
+            "devices": devices
+        }
 
     def pair_wireless(self, address_port: str, pairing_code: str) -> Tuple[bool, str]:
         """Pairs a wireless debugging device."""

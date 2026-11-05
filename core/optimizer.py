@@ -97,10 +97,17 @@ class StorageOptimizer:
         return True
 
     def _clean_crash_logs(self, serial: Optional[str]) -> bool:
-        """Vector 6: Purges tombstones and crash dumpstate."""
-        script = "rm -rf /data/tombstones/* 2>/dev/null; rm -rf /data/log/* 2>/dev/null"
-        self.adb.shell(script, target_device=serial, timeout=8)
-        return True
+        """Vector 6: Clears system DropBox crash logs, tombstones, and temp crash dumps."""
+        # Clears DropBoxManager crash events (accessible by shell uid=2000)
+        code, _, _ = self.adb.shell("dumpsys dropbox --clear", target_device=serial, timeout=8)
+        # Prune accessible crash traces in emulated storage
+        self.adb.shell(
+            "rm -rf /storage/emulated/0/Android/data/*/cache/*crash* 2>/dev/null; "
+            "rm -rf /storage/emulated/0/Android/data/*/cache/*dump* 2>/dev/null",
+            target_device=serial,
+            timeout=8
+        )
+        return code == 0
 
     def _extract_free_kb(self, df_output: str) -> int:
         lines = df_output.strip().splitlines()

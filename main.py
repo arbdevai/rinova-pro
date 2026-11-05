@@ -49,6 +49,15 @@ class DesktopAPIBridge:
     def connect_wireless(self, payload):
         return self.api.connect_wireless(payload.get("address_port", ""))
 
+    def heartbeat(self, payload=None):
+        return self.api.heartbeat()
+
+    def check_update(self, payload=None):
+        return self.api.check_update()
+
+    def get_app_version(self, payload=None):
+        return self.api.get_app_version()
+
     def disconnect_device(self, payload=None):
         return self.api.disconnect_device(payload.get("address_port") if payload else None)
 
@@ -84,7 +93,10 @@ def main():
         bridge.batch_package_action,
         bridge.pair_wireless,
         bridge.connect_wireless,
-        bridge.disconnect_device
+        bridge.disconnect_device,
+        bridge.heartbeat,
+        bridge.check_update,
+        bridge.get_app_version
     )
 
     webview.start(debug=False)

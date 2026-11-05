@@ -8,6 +8,8 @@ from core.device import DeviceInspector
 from core.analyzer import StorageAnalyzer
 from core.optimizer import StorageOptimizer
 from core.debloater import Debloater
+from core.updater import UpdateChecker
+from core.version import APP_VERSION
 
 class RinovaAPI:
     def __init__(self):
@@ -16,9 +18,13 @@ class RinovaAPI:
         self.storage_analyzer = StorageAnalyzer(self.adb)
         self.storage_optimizer = StorageOptimizer(self.adb)
         self.debloater = Debloater(self.adb)
+        self.updater = UpdateChecker()
 
     def get_devices(self) -> List[Dict[str, Any]]:
         return self.adb.list_devices()
+
+    def heartbeat(self) -> Dict[str, Any]:
+        return self.adb.get_heartbeat()
 
     def select_device(self, serial: str) -> Dict[str, Any]:
         self.adb.selected_device = serial
@@ -50,3 +56,9 @@ class RinovaAPI:
     def disconnect_device(self, address_port: Optional[str] = None) -> Dict[str, Any]:
         success, message = self.adb.disconnect(address_port)
         return {"success": success, "message": message}
+
+    def check_update(self) -> Dict[str, Any]:
+        return self.updater.check_update()
+
+    def get_app_version(self) -> Dict[str, str]:
+        return {"version": APP_VERSION}

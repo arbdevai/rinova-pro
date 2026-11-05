@@ -61,6 +61,12 @@
     </div>
 
     <div class="flex items-center gap-3">
+      <!-- Update notification pill -->
+      <button id="btn-update-pill" onclick="openUpdateModal()" class="hidden h-8 px-2.5 rounded-md bg-brand-500/10 border border-brand-500/40 text-brand-400 hover:bg-brand-500/20 text-xs flex items-center gap-1.5 transition-colors">
+        <i class="ph-bold ph-arrow-circle-up text-xs"></i>
+        <span id="update-pill-text">Update Ready</span>
+      </button>
+
       <div id="device-pill" class="flex items-center gap-2.5 px-3 py-1.5 rounded-md bg-dark-850 border border-dark-border text-xs">
         <span id="device-dot" class="w-2 h-2 rounded-full bg-zinc-600"></span>
         <span id="device-text" class="text-zinc-300 font-medium font-mono text-[11px]">DISCONNECTED</span>
@@ -71,6 +77,47 @@
       </button>
     </div>
   </header>
+
+  <!-- ================= DEVICE TELEMETRY SUB-BAR ================= -->
+  <aside id="telemetry-bar" class="h-10 border-b border-dark-border bg-dark-900/40 px-6 flex items-center justify-between text-xs">
+    <!-- Connected State -->
+    <div id="telemetry-connected" class="hidden items-center gap-6 overflow-x-auto py-1">
+      <div class="flex items-center gap-2 text-zinc-300">
+        <i class="ph-bold ph-device-mobile text-brand-400"></i>
+        <span id="telemetry-device" class="font-semibold text-white font-mono text-[11px]">--</span>
+      </div>
+      <div class="h-3 w-px bg-dark-border"></div>
+      <div class="flex items-center gap-1.5 text-zinc-400 text-[11px]">
+        <i class="ph-bold ph-android-logo text-emerald-400"></i>
+        <span id="telemetry-os">Android --</span>
+      </div>
+      <div class="h-3 w-px bg-dark-border"></div>
+      <div class="flex items-center gap-1.5 text-zinc-400 text-[11px]">
+        <i class="ph-bold ph-shield-check text-sky-400"></i>
+        <span>Patch:</span>
+        <span id="telemetry-patch" class="font-mono text-zinc-300">--</span>
+      </div>
+      <div class="h-3 w-px bg-dark-border"></div>
+      <div class="flex items-center gap-1.5 text-zinc-400 text-[11px]">
+        <i class="ph-bold ph-battery-charging text-amber-400"></i>
+        <span id="telemetry-battery" class="font-mono text-zinc-200">--%</span>
+        <span class="text-zinc-600">•</span>
+        <span id="telemetry-temp" class="font-mono text-zinc-400">--°C</span>
+      </div>
+    </div>
+
+    <!-- Disconnected State -->
+    <div id="telemetry-disconnected" class="flex items-center gap-2 text-zinc-500 text-[11px]">
+      <i class="ph-bold ph-plugs-connected text-zinc-600"></i>
+      <span>Menunggu perangkat — Hubungkan kabel USB dengan USB Debugging aktif atau gunakan Wireless ADB.</span>
+    </div>
+
+    <!-- Right Side: Mode badge & serial -->
+    <div id="telemetry-transport" class="hidden sm:flex items-center gap-2 text-[10px] font-mono">
+      <span id="telemetry-mode-badge" class="px-2 py-0.5 rounded bg-dark-800 text-zinc-400 border border-dark-border uppercase">USB</span>
+      <span id="telemetry-serial" class="text-zinc-500">SERIAL: --</span>
+    </div>
+  </aside>
 
   <!-- ================= MAIN VIEWPORT ================= -->
   <main class="flex-1 overflow-y-auto p-6 space-y-6 bg-dark-950">
@@ -471,6 +518,96 @@
         <button id="modal-btn-confirm" onclick="executeBatchActionConfirmed()" class="h-8 px-4 rounded-md text-xs font-medium bg-brand-500 hover:bg-brand-600 text-white transition-colors">
           Execute
         </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= STORAGE REMEDIATION CONFIRMATION MODAL ================= -->
+  <div id="remediation-modal" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden opacity-0 transition-opacity duration-150">
+    <div class="w-full max-w-lg p-5 rounded-lg bg-dark-900 border border-dark-border shadow-2xl space-y-4">
+      <div class="flex items-start justify-between">
+        <div>
+          <h3 class="text-sm font-semibold text-white flex items-center gap-2">
+            <i class="ph-bold ph-warning-octagon text-brand-400"></i>
+            <span>Konfirmasi Remediasi Multi-Vector</span>
+          </h3>
+          <p class="text-xs text-zinc-400 mt-0.5">Operasi terarah untuk membersihkan sektor partisi /data yang bermasalah.</p>
+        </div>
+        <button onclick="closeRemediationModal()" class="text-zinc-500 hover:text-zinc-300">
+          <i class="ph-bold ph-x text-sm"></i>
+        </button>
+      </div>
+
+      <div class="p-3 rounded-lg bg-dark-950 border border-dark-border space-y-2">
+        <div class="flex items-center justify-between text-xs pb-2 border-b border-dark-border">
+          <span class="text-zinc-400">Target Vector Terpilih:</span>
+          <span id="remed-modal-count" class="font-mono font-semibold text-brand-400">0 Vector</span>
+        </div>
+        <div class="flex items-center justify-between text-xs pb-2 border-b border-dark-border">
+          <span class="text-zinc-400">Estimasi Ruang Dipulihkan:</span>
+          <span id="remed-modal-space" class="font-mono font-bold text-emerald-400">0.00 GB</span>
+        </div>
+        <div id="remed-modal-list" class="max-h-36 overflow-y-auto space-y-1.5 pt-1">
+          <!-- Dynamically filled -->
+        </div>
+      </div>
+
+      <div class="p-3 rounded bg-amber-500/10 border border-amber-500/20 text-xs text-amber-300 flex items-start gap-2.5">
+        <i class="ph-bold ph-shield-check text-base text-amber-400 flex-shrink-0 mt-0.5"></i>
+        <div class="space-y-0.5">
+          <div class="font-semibold text-amber-200">Integritas Data Pengguna Terjamin</div>
+          <p class="text-[11px] text-amber-300/80 leading-relaxed">
+            Hanya database indeks usang, backup harian duplikat, dan cache sistem yang diremediasi. Foto fisik, video di DCIM, dokumen, dan chat aktif tidak akan terhapus.
+          </p>
+        </div>
+      </div>
+
+      <div class="flex items-center justify-end gap-2 pt-1">
+        <button onclick="closeRemediationModal()" class="h-8 px-3 rounded-md text-xs font-medium bg-dark-850 hover:bg-dark-800 text-zinc-300 border border-dark-border transition-colors">
+          Batal
+        </button>
+        <button id="remed-modal-confirm-btn" onclick="executeRemediationConfirmed()" class="h-8 px-4 rounded-md text-xs font-medium bg-brand-500 hover:bg-brand-600 text-white transition-colors flex items-center gap-1.5">
+          <i class="ph-bold ph-lightning text-xs"></i>
+          <span>Eksekusi Remediasi</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= IN-APP UPDATE MODAL ================= -->
+  <div id="update-modal" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden opacity-0 transition-opacity duration-150">
+    <div class="w-full max-w-md p-5 rounded-lg bg-dark-900 border border-brand-500/40 shadow-2xl space-y-4">
+      <div class="flex items-start justify-between">
+        <div>
+          <h3 class="text-sm font-semibold text-white flex items-center gap-2">
+            <i class="ph-bold ph-arrow-circle-up text-brand-400 text-base"></i>
+            <span>Pembaruan Tersedia</span>
+          </h3>
+          <p id="update-modal-ver" class="text-xs text-brand-400 font-mono mt-0.5">v1.0.1</p>
+        </div>
+        <button onclick="closeUpdateModal()" class="text-zinc-500 hover:text-zinc-300">
+          <i class="ph-bold ph-x text-sm"></i>
+        </button>
+      </div>
+
+      <div class="p-3 rounded-lg bg-dark-950 border border-dark-border space-y-1.5">
+        <div class="text-[11px] font-semibold text-zinc-300 uppercase tracking-wider">Catatan Rilis:</div>
+        <div id="update-modal-notes" class="text-xs text-zinc-400 max-h-36 overflow-y-auto whitespace-pre-wrap font-sans leading-relaxed"></div>
+      </div>
+
+      <div class="flex items-center justify-between text-xs text-zinc-500 pt-1">
+        <span>File: <span id="update-modal-file" class="font-mono text-zinc-300">RinovaPro-Windows-Portable.zip</span></span>
+        <span id="update-modal-current" class="font-mono">Current: v1.0.0</span>
+      </div>
+
+      <div class="flex items-center justify-end gap-2 pt-2">
+        <button onclick="closeUpdateModal()" class="h-8 px-3 rounded-md text-xs font-medium bg-dark-850 hover:bg-dark-800 text-zinc-300 border border-dark-border transition-colors">
+          Nanti Saja
+        </button>
+        <a id="update-modal-download-btn" href="#" target="_blank" class="h-8 px-4 rounded-md text-xs font-medium bg-brand-500 hover:bg-brand-600 text-white transition-colors flex items-center gap-1.5 inline-flex">
+          <i class="ph-bold ph-download-simple text-xs"></i>
+          <span>Unduh Pembaruan</span>
+        </a>
       </div>
     </div>
   </div>

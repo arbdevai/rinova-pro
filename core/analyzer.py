@@ -256,32 +256,41 @@ class StorageAnalyzer:
         }
 
     def _audit_crash_logs(self, serial: Optional[str]) -> Dict[str, Any]:
-        """Vector 6: Checks crash tombstones and system logs (/data/log, /data/tombstones)."""
-        check_cmd = "du -sk /data/tombstones 2>/dev/null; du -sk /data/log 2>/dev/null"
-        code, out, _ = self.adb.shell(check_cmd, target_device=serial)
-        kb = 0
+        """Vector 6: Audits system crash dumps, DropBox entries, and tombstone traces."""
+        code, out, _ = self.adb.shell("dumpsys dropbox | grep -E 'Drop box contents:|entries'", target_device=serial, timeout=8)
+        entry_count = 0
         if code == 0 and out:
-            for line in out.splitlines():
+            match = re.search(r"(\d+)\s+entries", out)
+            if match:
+                entry_count = int(match.group(1))
+
+        # Check accessible app crash dumps in storage
+        check_cmd = "du -sk /storage/emulated/0/Android/data/*/cache/*crash* 2>/dev/null; du -sk /storage/emulated/0/Android/data/*/cache/*dump* 2>/dev/null"
+        _, out_sd, _ = self.adb.shell(check_cmd, target_device=serial, timeout=5)
+        sd_kb = 0
+        if out_sd:
+            for line in out_sd.splitlines():
                 parts = line.strip().split()
                 if len(parts) >= 2:
                     try:
-                        kb += int(parts[0])
+                        sd_kb += int(parts[0])
                     except ValueError:
                         pass
 
-        mb = round(kb / 1024, 2)
+        # Estimate MB (average DropBox entry + file caches)
+        mb = round((entry_count * 0.15) + (sd_kb / 1024), 2)
         gb = round(mb / 1024, 2)
-        has_logs = mb > 50
+        has_logs = (entry_count > 50) or (mb > 20.0)
 
         return {
             "id": "crash_logs",
-            "title": "System Crash Dumps & Logcat (SysDump / Tombstones)",
-            "target": "/data/tombstones & /data/log",
+            "title": "System Crash Dumps & DropBox Logs (Tombstones/ANR)",
+            "target": "DropBoxManager & App Crash Traces",
             "size_mb": mb,
             "size_gb": gb,
             "reclaimable": has_logs,
             "severity": "MEDIUM" if has_logs else "CLEAN",
-            "note": "Log crash dumpstate sistem yang menumpuk di partisi /data." if has_logs else "Log sistem dalam kondisi normal."
+            "note": f"Ditemukan {entry_count} riwayat crash/ANR di DropBox dan trace cache sistem." if has_logs else "Log crash sistem dan DropBox dalam batas normal."
         }
 
     def _parse_diskstats(self, content: str) -> List[Dict[str, Any]]:
